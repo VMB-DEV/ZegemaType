@@ -59,21 +59,37 @@ pub fn main() !void {
     try disableEcho();
     defer enableEcho() catch {};
 
-    const target = "i present my zig first program";
-    // const target = "Hello world";
-
-    // Parse target and separate words by space
-    var words_iter = std.mem.splitSequence(u8, target, " ");
-    var words: [10][]const u8 = undefined;
-    var word_count: usize = 0;
-    while (words_iter.next()) |word| {
-        words[word_count] = word;
-        word_count += 1;
+    // Generate random seed and create RNG
+    var prng = std.Random.DefaultPrng.init(blk: {
+        var seed: u64 = undefined;
+        try std.posix.getrandom(std.mem.asBytes(&seed));
+        break :blk seed;
+    });
+    const random = prng.random();
+    
+    // Select 10 random words from ALL_WORDS
+    const words: [10][]const u8 = blk: {
+        var result: [10][]const u8 = undefined;
+        for (&result) |*word| {
+            const random_index = random.intRangeAtMost(usize, 0, ALL_WORDS.len - 1);
+            word.* = ALL_WORDS[random_index];
+        }
+        break :blk result;
+    };
+    
+    // Create target string from selected words
+    var target_buffer: [256]u8 = undefined;
+    var target_len: usize = 0;
+    for (words, 0..) |word, i| {
+        @memcpy(target_buffer[target_len..target_len + word.len], word);
+        target_len += word.len;
+        if (i < words.len - 1) {
+            target_buffer[target_len] = ' ';
+            target_len += 1;
+        }
     }
+    const target = target_buffer[0..target_len];
 
-    // print the sentence to write and the cursor
-    // std.debug.print("\x1b[90m{s}\x1b[0m", .{target});
-    // std.debug.print("{s}{s}{s}", .{ Color.target.toString(), target, Color.reset.toString() });
     printColoredString(Color.target, target);
     std.debug.print("\x1b[{}D", .{target.len + 1});
 
@@ -101,3 +117,5 @@ pub fn main() !void {
         index += 1;
     }
 }
+
+const ALL_WORDS = [_][]const u8{ "i", "present", "my", "zig", "first", "program", "all", "software", "ai", "none", "all", "fast", "blazingly", "update", "upgrade", "improve", "understanding", "publication", "contact", "note", "hobby", "intervention", "discovery", "volcano", "trait", "balance", "criminal", "nerve", "dialect", "mutual", "terrace", "post", "lace", "tile", "tie", "exploit", "ancestor", "advance", "exchange", "building", "watch", "appreciate", "detective", "disagreement", "excavate", "experienced ", };
