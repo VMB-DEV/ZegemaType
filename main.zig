@@ -35,6 +35,8 @@ fn enableEcho() !void {
     try posix.tcsetattr(std.fs.File.stdin().handle, .NOW, termios);
 }
 
+
+
 test "all colors have valid toString output" {
     // Test all enum values
     inline for (std.meta.fields(Color)) |field| {
@@ -63,7 +65,89 @@ fn printGrayedWords(words: []*const  []const u8) void {
     }
 }
 
-fn getRandomWords(allocator: std.mem.Allocator, n: usize) ![]*const []const u8 {
+test "getRandomWords returns correct number of words" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const words = try getRandomWords(allocator, 5);
+    try std.testing.expect(words.len == 5);
+
+    const single_word = try getRandomWords(allocator, 1);
+    try std.testing.expect(single_word.len == 1);
+
+    const many_words = try getRandomWords(allocator, 50);
+    try std.testing.expect(many_words.len == 50);
+}
+
+test "getRandomWords returns valid word pointers" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const words = try getRandomWords(allocator, 10);
+
+    // Check each word pointer is valid and points to a word from ALL_WORDS
+    for (words) |word_ptr| {
+        try std.testing.expect(word_ptr.*.len > 0);
+
+        // Verify the word exists in ALL_WORDS
+        var found = false;
+        for (ALL_WORDS) |dict_word| {
+            if (std.mem.eql(u8, word_ptr.*, dict_word)) {
+                found = true;
+                break;
+            }
+        }
+        try std.testing.expect(found);
+    }
+}
+
+test "getRandomWords handles zero words" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const words = try getRandomWords(allocator, 0);
+    try std.testing.expect(words.len == 0);
+}
+
+test "getRandomWords produces different results across calls" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const words1 = try getRandomWords(allocator, 10);
+    const words2 = try getRandomWords(allocator, 10);
+
+    // While it's theoretically possible for random results to be identical,
+    // with 44 words in the dictionary and 10 selections, it's very unlikely
+    var identical = true;
+    for (words1, words2) |w1, w2| {
+        if (!std.mem.eql(u8, w1.*, w2.*)) {
+            identical = false;
+            break;
+        }
+    }
+    try std.testing.expect(!identical);
+}
+
+test "getRandomWords memory allocation" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // Test that memory is properly allocated
+    const words = try getRandomWords(allocator, 3);
+    try std.testing.expect(words.len == 3);
+
+    // Verify we can access all word data
+    for (words) |word_ptr| {
+        _ = word_ptr.*.len; // Should not crash
+        _ = word_ptr.*[0]; // Should not crash if word is non-empty
+    }
+}
+pub fn getRandomWords(allocator: std.mem.Allocator, n: usize) ![]*const []const u8 {
     // Generate random seed and create RNG (classic PNRG instead of CSPRNG)
     var prng = std.Random.DefaultPrng.init(blk: {
         var seed: u64 = undefined;
@@ -155,4 +239,4 @@ pub fn main() !void {
     }
 }
 
-const ALL_WORDS = [_][]const u8{ "i", "present", "my", "zig", "first", "program", "all", "software", "ai", "none", "all", "fast", "blazingly", "update", "upgrade", "improve", "understanding", "publication", "contact", "note", "hobby", "intervention", "discovery", "volcano", "trait", "balance", "criminal", "nerve", "dialect", "mutual", "terrace", "post", "lace", "tile", "tie", "exploit", "ancestor", "advance", "exchange", "building", "watch", "appreciate", "detective", "disagreement", "excavate", "experienced ", };
+pub const ALL_WORDS = [_][]const u8{ "i", "present", "my", "zig", "first", "program", "all", "software", "ai", "none", "all", "fast", "blazingly", "update", "upgrade", "improve", "understanding", "publication", "contact", "note", "hobby", "intervention", "discovery", "volcano", "trait", "balance", "criminal", "nerve", "dialect", "mutual", "terrace", "post", "lace", "tile", "tie", "exploit", "ancestor", "advance", "exchange", "building", "watch", "appreciate", "detective", "disagreement", "excavate", "experienced ", };
