@@ -20,23 +20,6 @@ const Color = enum {
     }
 };
 
-fn disableEcho() !void {
-    var termios = try posix.tcgetattr(std.fs.File.stdin().handle);
-    termios.lflag.ECHO = false;
-    termios.lflag.ICANON = false;
-    termios.iflag.ICRNL = false;
-    try posix.tcsetattr(std.fs.File.stdin().handle, .NOW, termios);
-}
-
-fn enableEcho() !void {
-    var termios = try posix.tcgetattr(std.fs.File.stdin().handle);
-    termios.lflag.ECHO = true;
-    termios.lflag.ICANON = true;
-    try posix.tcsetattr(std.fs.File.stdin().handle, .NOW, termios);
-}
-
-
-
 test "all colors have valid toString output" {
     // Test all enum values
     inline for (std.meta.fields(Color)) |field| {
@@ -147,21 +130,117 @@ test "getRandomWords memory allocation" {
         _ = word_ptr.*[0]; // Should not crash if word is non-empty
     }
 }
-pub fn getRandomWords(allocator: std.mem.Allocator, n: usize) ![]*const []const u8 {
+
+pub fn getRandomWords(allocator: std.mem.Allocator, n: usize) [][]const u8 {
     // Generate random seed and create RNG (classic PNRG instead of CSPRNG)
     var prng = std.Random.DefaultPrng.init(blk: {
         var seed: u64 = undefined;
         try std.posix.getrandom(std.mem.asBytes(&seed));
         break :blk seed;
-    });    const random: std.Random = prng.random();    // Calculate total length for cursor positioning
+    });
+    const random: std.Random = prng.random();    // Calculate total length for cursor positioning
 
     // Create an array of pointers to string
-    const result = try allocator.alloc(*const []const u8, n);
+    const result: [][]const u8 = try allocator.alloc([]const u8, n);
     for (result) |*word_ptr| {
         const random_index = random.intRangeAtMost(usize, 0, ALL_WORDS.len - 1);
         word_ptr.* = &ALL_WORDS[random_index];
     }
     return result;
+}
+
+const CharState = enum {
+    toComplete,
+    valid,
+    invalid,
+};
+
+const WordState = struct {
+    word: []const u8,
+    char_states: []CharState,
+    overflow: []u8,
+
+    pub fn init(allocator: std.mem.Allocator, word: []const u8) !WordState {
+        const chars_state: []CharState = try allocator.alloc(CharState, word.len);
+        @memset(chars_state, .toComplete);
+
+        return WordState{
+            .word = word,
+            .char_states = chars_state,
+            .overflow = undefined,
+        };
+    }
+
+    pub fn deinit(self: *WordState, allocator: std.mem.Allocator) void {
+        allocator.free(self.char_states);
+    }
+
+    pub fn updateCharAt(self: *WordState, index: usize, typed_char: u8) void {
+        if (index < self.word.len) {
+            // Update character state within word bounds
+            if (self.word[index] == typed_char) {
+                self.char_states[index] = .valid;
+            } else {
+                self.char_states[index] = .invalid;
+            }
+        } else {
+            // Overflow case - increment overflow counter
+            self.overflow += 1;
+        }
+    }
+
+    pub fn print(self: WordState) void {
+        for (self.word, 0..) |char, i| {
+            const color = switch (self.char_states[i]) {
+                .toComplete => Color.gray,
+                .valid => Color.correct,
+                .invalid => Color.error_fg,
+            };
+            printColoredChar(color, char);
+        }
+
+        // Print overflow characters if any
+        for (0..self.overflow) |_| {
+            printColoredChar(.error_bg, 'X'); // Placeholder for overflow
+        }
+    }
+};
+
+const WordsState = struct {
+    words_state: []WordState,
+    pub fn init(allocator: std.mem.Allocator, number_of_words: usize) !WordsState {
+        const words: [][]const u8 = getRandomWords(allocator, number_of_words);
+        const words_state: []WordsState = try allocator.alloc(WordState, number_of_words);
+        errdefer allocator.free(words_state);
+
+        for (words_state, 0..) |wordState, i| {
+            wordState = try WordState.init(allocator, words_state);
+        }
+        return WordsState{
+            .words_state = words_state,
+        };
+    }
+    pub fn deinit(self: *WordsState, allocator: std.mem.Allocator) void {
+        for (self.words) |word| {
+            word.deinit();
+        }
+        allocator.free(self.words);
+    }
+};
+
+fn disableEcho() !void {
+    var termios = try posix.tcgetattr(std.fs.File.stdin().handle);
+    termios.lflag.ECHO = false;
+    termios.lflag.ICANON = false;
+    termios.iflag.ICRNL = false;
+    try posix.tcsetattr(std.fs.File.stdin().handle, .NOW, termios);
+}
+
+fn enableEcho() !void {
+    var termios = try posix.tcgetattr(std.fs.File.stdin().handle);
+    termios.lflag.ECHO = true;
+    termios.lflag.ICANON = true;
+    try posix.tcsetattr(std.fs.File.stdin().handle, .NOW, termios);
 }
 
 pub fn main() !void {
@@ -175,6 +254,7 @@ pub fn main() !void {
 
     const numberOfWords: comptime_int = 10;
     const words: []*const []const u8 = try getRandomWords(allocator, numberOfWords);
+    // const charsState: *[]
     printGrayedWords(words);
 
     var total_len: usize = 0;
@@ -221,6 +301,7 @@ pub fn main() !void {
             }
             continue;
         }
+        //todo: enter key behavior
 
         // Handle regular character input
         if (char_in_word < words[current_word].len) {
@@ -235,6 +316,37 @@ pub fn main() !void {
             // Overflow - beyond word length
             printColoredChar(.error_bg, byte);
             overflow_chars += 1;
+
+            // // Move to beginning of line, clear entire line, and reprint everything
+            // std.debug.print("\x1b[2K\x1b[G", .{}); // Clear entire line and move to beginning
+            //
+            // var idx_to_substract: usize = 0;
+            // Reprint all words with current progress
+            for (words, 0..) |word, word_idx| {
+                if (word_idx > 0) printColoredChar(.gray, ' ');
+
+                if (word_idx < current_word) {
+                    // Already completed words - show in correct color
+                    printColoredString(.correct, word.*);
+                } else if (word_idx == current_word) {
+                    // Current word - show typed part + overflow + remaining
+                    for (word.*[0..char_in_word]) |c| {
+                        printColoredChar(.correct, c);
+                    }
+                    // Show overflow characters that were typed
+                    for (0..overflow_chars) |_| {
+                        printColoredChar(.error_bg, 'X'); // Placeholder for overflow chars
+                    }
+                    // Show remaining part of current word in gray
+                    if (char_in_word < word.len) {
+                        printColoredString(.gray, word.*[char_in_word..]);
+                    }
+                } else {
+                    // Future words in gray
+                    printColoredString(.gray, word.*);
+                }
+            }
+            std.debug.print("\x1b[{}D", .{total_len});
         }
     }
 }
