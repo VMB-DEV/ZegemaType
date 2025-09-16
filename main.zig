@@ -39,9 +39,9 @@ fn printColoredString(color: Color, string: []const u8) void {
     std.debug.print("{s}{s}{s}", .{ color.toString(), string, Color.reset.toString() });
 }
 
-fn printGrayedWords(words: []*const  []const u8) void {
+fn printGrayedWords(words: [][]const u8) void {
     for (words, 0..) |word, i| {
-        printColoredString(Color.gray, word.*);
+        printColoredString(Color.gray, word);
         if (i < words.len - 1) {
             printColoredChar(Color.gray, ' ');
         }
@@ -71,13 +71,13 @@ test "getRandomWords returns valid word pointers" {
     const words = try getRandomWords(allocator, 10);
 
     // Check each word pointer is valid and points to a word from ALL_WORDS
-    for (words) |word_ptr| {
-        try std.testing.expect(word_ptr.*.len > 0);
+    for (words) |word| {
+        try std.testing.expect(word.len > 0);
 
         // Verify the word exists in ALL_WORDS
         var found = false;
         for (ALL_WORDS) |dict_word| {
-            if (std.mem.eql(u8, word_ptr.*, dict_word)) {
+            if (std.mem.eql(u8, word, dict_word)) {
                 found = true;
                 break;
             }
@@ -107,7 +107,7 @@ test "getRandomWords produces different results across calls" {
     // with 44 words in the dictionary and 10 selections, it's very unlikely
     var identical = true;
     for (words1, words2) |w1, w2| {
-        if (!std.mem.eql(u8, w1.*, w2.*)) {
+        if (!std.mem.eql(u8, w1, w2)) {
             identical = false;
             break;
         }
@@ -125,13 +125,13 @@ test "getRandomWords memory allocation" {
     try std.testing.expect(words.len == 3);
 
     // Verify we can access all word data
-    for (words) |word_ptr| {
-        _ = word_ptr.*.len; // Should not crash
-        _ = word_ptr.*[0]; // Should not crash if word is non-empty
+    for (words) |word| {
+        _ = word.len; // Should not crash
+        _ = word[0]; // Should not crash if word is non-empty
     }
 }
 
-pub fn getRandomWords(allocator: std.mem.Allocator, n: usize) [][]const u8 {
+pub fn getRandomWords(allocator: std.mem.Allocator, n: usize) ![][]const u8 {
     // Generate random seed and create RNG (classic PNRG instead of CSPRNG)
     var prng = std.Random.DefaultPrng.init(blk: {
         var seed: u64 = undefined;
@@ -140,11 +140,10 @@ pub fn getRandomWords(allocator: std.mem.Allocator, n: usize) [][]const u8 {
     });
     const random: std.Random = prng.random();    // Calculate total length for cursor positioning
 
-    // Create an array of pointers to string
     const result: [][]const u8 = try allocator.alloc([]const u8, n);
-    for (result) |*word_ptr| {
+    for (result, 0..) |_, i| {
         const random_index = random.intRangeAtMost(usize, 0, ALL_WORDS.len - 1);
-        word_ptr.* = &ALL_WORDS[random_index];
+        result[i] = ALL_WORDS[random_index];
     }
     return result;
 }
@@ -156,18 +155,19 @@ const CharState = enum {
 };
 
 const WordState = struct {
-    word: []const u8,
+    word_slice: []const u8,
     char_states: []CharState,
-    overflow: []u8,
+    overflow: [10]u8,
 
-    pub fn init(allocator: std.mem.Allocator, word: []const u8) !WordState {
-        const chars_state: []CharState = try allocator.alloc(CharState, word.len);
+
+    pub fn init(allocator: std.mem.Allocator, word_slice: []const u8) !WordState {
+        const chars_state: []CharState = try allocator.alloc(CharState, word_slice.len);
         @memset(chars_state, .toComplete);
 
         return WordState{
-            .word = word,
+            .word_slice = word_slice,
             .char_states = chars_state,
-            .overflow = undefined,
+            .overflow = [_]u8{0} ** 10,
         };
     }
 
@@ -176,21 +176,23 @@ const WordState = struct {
     }
 
     pub fn updateCharAt(self: *WordState, index: usize, typed_char: u8) void {
-        if (index < self.word.len) {
+        if (index < self.word_slice.len) {
             // Update character state within word bounds
-            if (self.word[index] == typed_char) {
+            if (self.word_slice[index] == typed_char) {
                 self.char_states[index] = .valid;
             } else {
                 self.char_states[index] = .invalid;
             }
         } else {
             // Overflow case - increment overflow counter
-            self.overflow += 1;
+            const overflow_idx = index - self.word_slice.len;
+            if (overflow_idx > 9) return;
+            self.overflow[overflow_idx] = typed_char;
         }
     }
 
     pub fn print(self: WordState) void {
-        for (self.word, 0..) |char, i| {
+        for (self.word_slice, 0..) |char, i| {
             const color = switch (self.char_states[i]) {
                 .toComplete => Color.gray,
                 .valid => Color.correct,
@@ -206,26 +208,168 @@ const WordState = struct {
     }
 };
 
-const WordsState = struct {
-    words_state: []WordState,
-    pub fn init(allocator: std.mem.Allocator, number_of_words: usize) !WordsState {
-        const words: [][]const u8 = getRandomWords(allocator, number_of_words);
-        const words_state: []WordsState = try allocator.alloc(WordState, number_of_words);
-        errdefer allocator.free(words_state);
+const Printing = struct {
+    pub fn printAChar() void {}
+    pub fn printJumpToNextWord() void {}
+    pub fn printBackSpace() void {}
+    pub fn printOverflow() void {}
+}
 
-        for (words_state, 0..) |wordState, i| {
-            wordState = try WordState.init(allocator, words_state);
+const WordsState = struct {
+    word_states: []WordState,
+    word_slices: [][]const u8,
+    total_length: usize,
+
+    pub fn init(allocator: std.mem.Allocator, number_of_words: usize) !WordsState {
+        const word_slices: [][]const u8 = try getRandomWords(allocator, number_of_words);
+        errdefer allocator.free(word_slices);
+        const word_states: []WordState = try allocator.alloc(WordState, number_of_words);
+        errdefer allocator.free(word_states);
+
+        for (word_states, 0..) |*word_state, i| {
+            word_state.* =  try WordState.init(allocator, word_slices[i]);
         }
+
         return WordsState{
-            .words_state = words_state,
+            .word_states = word_states,
+            .word_slices = word_slices,
+            .total_length = blk: {
+                var l: usize = 0;
+                // getting all the characters
+                for (word_slices) |word_slice| { l += word_slice.len ;}
+                // getting all the spaces
+                l += word_states.len - 1;
+                break :blk l;
+            },
         };
     }
     pub fn deinit(self: *WordsState, allocator: std.mem.Allocator) void {
-        for (self.words) |word| {
-            word.deinit();
+        for (self.word_states) |*word_state| {
+            word_state.deinit(allocator);
         }
-        allocator.free(self.words);
+        allocator.free(self.word_states);
+        allocator.free(self.word_slices);
     }
+
+    pub fn newPrint(self: *const WordsState, word_idx: usize, char_idx: usize) void {
+        if (word_idx < self.word_slices.len and char_idx < self.word_slices[word_idx].len) {
+            const color: Color = switch (self.word_states[word_idx].char_states[char_idx]) {
+                .toComplete => .gray,
+                .valid => .correct,
+                .invalid => .error_fg,
+            };
+            printColoredChar(color, self.word_slices[word_idx][char_idx]);
+        }
+    }
+    pub fn print(self: *const WordsState, word_idx: usize, char_idx: usize) void {
+        std.debug.print("\x1b[?25l", .{}); // Hide cursor
+
+        // Clear entire line and go to beginning
+        std.debug.print("\x1b[2K\x1b[G", .{});
+
+        // Print all words with correct colors
+        for (self.word_slices, 0..) |word_slice, word_idx_l| {
+            for (word_slice, 0..) |char, char_idx_l| {
+                const color: Color = switch (self.word_states[word_idx_l].char_states[char_idx_l]) {
+                    .toComplete => .gray,
+                    .valid => .correct,
+                    .invalid => .error_fg,
+                };
+                printColoredChar(color, char);
+            }
+
+            // Print overflow characters for current word
+            if (word_idx_l == word_idx) {
+                for (self.word_states[word_idx_l].overflow) |overflow_char| {
+                    if (overflow_char != 0) {
+                        printColoredChar(.error_bg, overflow_char);
+                    }
+                }
+            }
+
+            if (word_idx_l < self.word_slices.len - 1) {
+                printColoredChar(Color.gray, ' ');
+            }
+        }
+
+        // Calculate cursor position and move there
+        var cursor_pos: usize = 0;
+        for (0..word_idx) |i| {
+            cursor_pos += self.word_slices[i].len + 1; // +1 for space
+        }
+        cursor_pos += char_idx;
+
+        // Move to cursor position and show cursor
+        std.debug.print("\x1b[G\x1b[{}C\x1b[?25h", .{cursor_pos});
+    }
+
+    pub fn print0(self: *const WordsState) void {
+        for (self.word_slices, 0..) |word_slice, word_idx_l| {
+            for (word_slice) | char | {
+                // const color: Color = switch (self.word_states[word_idx_l].char_states[char_idx_l]) {
+                //     .toComplete => .gray,
+                //     .valid => .correct,
+                //     .invalid => .error_fg,
+                // };
+                printColoredChar(.gray, char);
+            }
+            if (word_idx_l < self.word_slices.len - 1) {
+                printColoredChar(Color.gray, ' ');
+            }
+        }
+        //
+        // var cursor_pos: usize = char_idx;
+        // for (0..word_idx) |i| {
+        //     cursor_pos += self.word_slices[i].len;
+        //     if (i < word_idx) cursor_pos += 1; // Add space after each completed word
+        //   }
+        // std.debug.print("\x1b[{}D", .{self.total_length - cursor_pos});
+        // std.debug.print("\x1b[?25h", .{}); // Show cursor
+    }
+    // pub fn print(self: *const WordsState, word_idx: usize, char_idx: usize) void {
+    //         // std.debug.print("\x1b[?25l", .{}); // Hide cursor
+    //         // \x1b[2K clear the entire line \x1b[G mvoe the cursor to the left
+    //     // std.debug.print("\x1b[2K", .{});
+    //     // \x1b[1K - Clear from beginning of line to cursor
+    //     // \x1b[0K or \x1b[K - Clear from cursor to end of lin
+    //     // if (char_idx > 2) {
+    //     // std.debug.print("\x1b[K", .{});
+    //     // }
+    //     // else {
+    //     std.debug.print("\x1b[2K\x1b[G", .{});
+    //     // }
+    //
+    //     // const c1: Color = switch (self.word_states[word_idx].char_states[char_idx]) {
+    //     //     .toComplete => .gray,
+    //     //     .valid => .correct,
+    //     //     .invalid => .error_fg,
+    //     // };
+    //     // printColoredChar(c1, self.word_states[word_idx].word_slice[char_idx]);
+    //     for (self.word_slices, 0..) |word_slice, word_idx_l| {
+    //         // if (word_idx > 0 and word_idx > word_idx_l) continue;
+    //         for (word_slice, 0..) | char, char_idx_l | {
+    //             // if (char_idx > 0 and char_idx > char_idx_l) continue;
+    //             // if (char_idx_l < char_idx) continue;
+    //             const color: Color = switch (self.word_states[word_idx_l].char_states[char_idx_l]) {
+    //                 .toComplete => .gray,
+    //                 .valid => .correct,
+    //                 .invalid => .error_fg,
+    //             };
+    //             printColoredChar(color, char);
+    //         }
+    //         if (word_idx_l < self.word_slices.len - 1) {
+    //             printColoredChar(Color.gray, ' ');
+    //         }
+    //     }
+    //
+    //     var cursor_pos: usize = char_idx;
+    //     for (0..word_idx) |i| {
+    //         cursor_pos += self.word_slices[i].len;
+    //         if (i < word_idx) cursor_pos += 1; // Add space after each completed word
+    //       }
+    //     std.debug.print("\x1b[{}D", .{self.total_length - cursor_pos});
+    //     std.debug.print("\x1b[?25h", .{}); // Show cursor
+    // }
 };
 
 fn disableEcho() !void {
@@ -242,113 +386,179 @@ fn enableEcho() !void {
     termios.lflag.ICANON = true;
     try posix.tcsetattr(std.fs.File.stdin().handle, .NOW, termios);
 }
-
 pub fn main() !void {
-    var arena  = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
-    const allocator = arena.allocator();
+    const allocator: std.mem.Allocator = arena.allocator();
 
     try disableEcho();
     defer enableEcho() catch {};
 
-    const numberOfWords: comptime_int = 10;
-    const words: []*const []const u8 = try getRandomWords(allocator, numberOfWords);
-    // const charsState: *[]
-    printGrayedWords(words);
+    const number_of_words: comptime_int = 3;
+    const words_state: WordsState = try WordsState.init(allocator, number_of_words);
 
-    var total_len: usize = 0;
-    for (words) |word| total_len += word.len;
-    total_len += words.len - 1; // spaces between words
-    std.debug.print("\x1b[{}D", .{total_len});
 
     var buffer: [1]u8 = undefined;
-    var current_word: usize = 0;
-    var char_in_word: usize = 0;
-    var overflow_chars: usize = 0;
+    var esc_count: usize = 0;
+    var word_idx: usize = 0;
+    var char_idx: usize = 0;
 
-    while (current_word < words.len) {
+    // words_state.print(word_idx, char_idx);
+    words_state.print0();
+    std.debug.print("\x1b[{}D", .{words_state.total_length});
+
+    while (esc_count < 2) {
         const bytes_read = try std.fs.File.stdin().read(&buffer);
         if (bytes_read == 0) break;
         const byte = buffer[0];
 
-        // Handle backspace
+        // escape key
+        if (byte == '\x1b') {
+            esc_count += 1;
+        }
+        // backspace
+        // if (byte == '\x7f') {
+        // if (byte == '\x08') {
         if (byte == 127) {
-            if (overflow_chars > 0) {
-                overflow_chars -= 1;
-                std.debug.print("\x1b[1D \x1b[1D", .{});
-            } else if (char_in_word > 0) {
-                char_in_word -= 1;
-                const target_char = words[current_word].*[char_in_word];
-                std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
-            }
-            continue;
-        }
-
-        // Handle space - move to next word
-        if (byte == ' ') {
-            if (current_word < words.len - 1) {
-                // Skip remaining chars in current word and the space
-                const remaining_chars = words[current_word].len - char_in_word;
-                if (remaining_chars > 0) {
-                    std.debug.print("\x1b[{}C", .{remaining_chars});
-                }
-                std.debug.print("\x1b[1C", .{}); // skip the space
-
-                current_word += 1;
-                char_in_word = 0;
-                overflow_chars = 0;
-            }
-            continue;
-        }
-        //todo: enter key behavior
-
-        // Handle regular character input
-        if (char_in_word < words[current_word].len) {
-            // Within word bounds
-            if (byte == words[current_word].*[char_in_word]) {
-                printColoredChar(.correct, byte);
-            } else {
-                printColoredChar(.error_fg, byte);
-            }
-            char_in_word += 1;
-        } else {
-            // Overflow - beyond word length
-            printColoredChar(.error_bg, byte);
-            overflow_chars += 1;
-
-            // // Move to beginning of line, clear entire line, and reprint everything
-            // std.debug.print("\x1b[2K\x1b[G", .{}); // Clear entire line and move to beginning
-            //
-            // var idx_to_substract: usize = 0;
-            // Reprint all words with current progress
-            for (words, 0..) |word, word_idx| {
-                if (word_idx > 0) printColoredChar(.gray, ' ');
-
-                if (word_idx < current_word) {
-                    // Already completed words - show in correct color
-                    printColoredString(.correct, word.*);
-                } else if (word_idx == current_word) {
-                    // Current word - show typed part + overflow + remaining
-                    for (word.*[0..char_in_word]) |c| {
-                        printColoredChar(.correct, c);
-                    }
-                    // Show overflow characters that were typed
-                    for (0..overflow_chars) |_| {
-                        printColoredChar(.error_bg, 'X'); // Placeholder for overflow chars
-                    }
-                    // Show remaining part of current word in gray
-                    if (char_in_word < word.len) {
-                        printColoredString(.gray, word.*[char_in_word..]);
-                    }
+            if (words_state.word_states[word_idx].overflow.len > 0) {
+                // overflow_chars -= 1;
+                // std.debug.print("\x1b[1D \x1b[1D", .{});
+            } else if (char_idx > 0) {
+                char_idx -= 1;
+                // char_in_word -= 1;
+                // const target_char = words[current_word][char_in_word];
+                // std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
+            } else if (char_idx <= 0) {
+                if (word_idx == 0) {
+                    continue;
                 } else {
-                    // Future words in gray
-                    printColoredString(.gray, word.*);
+                    word_idx -= 1;
                 }
             }
-            std.debug.print("\x1b[{}D", .{total_len});
+            continue;
+        }
+        if (byte == ' ') {
+            // words_state.newPrint(word_idx, char_idx);
+            // if (l)
+            printColoredChar(.gray, ' ');
+            char_idx = 0;
+            word_idx += 1;
+        } else {
+            // if (byte == words_state.word_states[word_idx].word_slice[char_idx]) {
+            words_state.word_states[word_idx].updateCharAt(char_idx, byte);
+            words_state.newPrint(word_idx, char_idx);
+            char_idx += 1;
         }
     }
 }
+
+// pub fn main2() !void {
+//     var arena  = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+//     defer arena.deinit();
+//
+//     const allocator = arena.allocator();
+//
+//     try disableEcho();
+//     defer enableEcho() catch {};
+//
+//     const numberOfWords: comptime_int = 10;
+//     const words: [][]const u8 = try getRandomWords(allocator, numberOfWords);
+//     // const charsState: *[]
+//     printGrayedWords(words);
+//
+//     var total_len: usize = 0;
+//     for (words) |word| total_len += word.len;
+//     total_len += words.len - 1; // spaces between words
+//     std.debug.print("\x1b[{}D", .{total_len});
+//
+//     var buffer: [1]u8 = undefined;
+//     var current_word: usize = 0;
+//     var char_in_word: usize = 0;
+//     var overflow_chars: usize = 0;
+//
+//     while (current_word < words.len) {
+//         const bytes_read = try std.fs.File.stdin().read(&buffer);
+//         if (bytes_read == 0) break;
+//         const byte = buffer[0];
+//
+//         // Handle backspace
+//         if (byte == '\x7f') {
+//             if (overflow_chars > 0) {
+//                 overflow_chars -= 1;
+//                 std.debug.print("\x1b[1D \x1b[1D", .{});
+//             } else if (char_in_word > 0) {
+//                 char_in_word -= 1;
+//                 const target_char = words[current_word][char_in_word];
+//                 std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
+//             }
+//             continue;
+//         }
+//
+//         // Handle space - move to next word
+//         if (byte == ' ') {
+//             if (current_word < words.len - 1) {
+//                 // Skip remaining chars in current word and the space
+//                 const remaining_chars = words[current_word].len - char_in_word;
+//                 if (remaining_chars > 0) {
+//                     std.debug.print("\x1b[{}C", .{remaining_chars});
+//                 }
+//                 std.debug.print("\x1b[1C", .{}); // skip the space
+//
+//                 current_word += 1;
+//                 char_in_word = 0;
+//                 overflow_chars = 0;
+//             }
+//             continue;
+//         }
+//         //todo: enter key behavior
+//
+//         // Handle regular character input
+//         if (char_in_word < words[current_word].len) {
+//             // Within word bounds
+//             if (byte == words[current_word][char_in_word]) {
+//                 printColoredChar(.correct, byte);
+//             } else {
+//                 printColoredChar(.error_fg, byte);
+//             }
+//             char_in_word += 1;
+//         } else {
+//             // Overflow - beyond word length
+//             printColoredChar(.error_bg, byte);
+//             overflow_chars += 1;
+//
+//             // // Move to beginning of line, clear entire line, and reprint everything
+//             // std.debug.print("\x1b[2K\x1b[G", .{}); // Clear entire line and move to beginning
+//             //
+//             // var idx_to_substract: usize = 0;
+//             // Reprint all words with current progress
+//             for (words, 0..) |word, word_idx| {
+//                 if (word_idx > 0) printColoredChar(.gray, ' ');
+//
+//                 if (word_idx < current_word) {
+//                     // Already completed words - show in correct color
+//                     printColoredString(.correct, word);
+//                 } else if (word_idx == current_word) {
+//                     // Current word - show typed part + overflow + remaining
+//                     for (word[0..char_in_word]) |c| {
+//                         printColoredChar(.correct, c);
+//                     }
+//                     // Show overflow characters that were typed
+//                     for (0..overflow_chars) |_| {
+//                         printColoredChar(.error_bg, 'X'); // Placeholder for overflow chars
+//                     }
+//                     // Show remaining part of current word in gray
+//                     if (char_in_word < word.len) {
+//                         printColoredString(.gray, word[char_in_word..]);
+//                     }
+//                 } else {
+//                     // Future words in gray
+//                     printColoredString(.gray, word);
+//                 }
+//             }
+//             std.debug.print("\x1b[{}D", .{total_len});
+//         }
+//     }
+// }
 
 pub const ALL_WORDS = [_][]const u8{ "i", "present", "my", "zig", "first", "program", "all", "software", "ai", "none", "all", "fast", "blazingly", "update", "upgrade", "improve", "understanding", "publication", "contact", "note", "hobby", "intervention", "discovery", "volcano", "trait", "balance", "criminal", "nerve", "dialect", "mutual", "terrace", "post", "lace", "tile", "tie", "exploit", "ancestor", "advance", "exchange", "building", "watch", "appreciate", "detective", "disagreement", "excavate", "experienced ", };
