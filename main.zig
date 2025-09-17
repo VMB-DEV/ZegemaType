@@ -8,6 +8,10 @@ const Color = enum {
     error_fg,
     error_bg,
     reset,
+    gray_underline,
+    correct_underline,
+    error_fg_underline,
+    error_bg_underline,
 
     fn toString(self: Color) []const u8 {
         return switch (self) {
@@ -16,6 +20,10 @@ const Color = enum {
             .error_fg => "\x1b[38;2;202;71;84m",
             .error_bg => "\x1b[48;2;156;51;63m",
             .reset => "\x1b[0m",
+            .gray_underline => "\x1b[4;38;2;150;150;150m",
+            .correct_underline => "\x1b[4;38;2;226;183;20m",
+            .error_fg_underline => "\x1b[4;38;2;202;71;84m",
+            .error_bg_underline => "\x1b[4;48;2;156;51;63m",
         };
     }
 };
@@ -152,6 +160,14 @@ const CharState = enum {
     toComplete,
     valid,
     invalid,
+
+    fn toColor(self: CharState) Color {
+        return switch (self) {
+            .toComplete => .gray,
+            .valid => .correct,
+            .invalid => .error_fg_underline,
+        };
+    }
 };
 
 const WordState = struct {
@@ -160,6 +176,16 @@ const WordState = struct {
     overflow: [10]u8,
 
 
+    pub fn getFilledOverFlowLen(self: *WordState) usize {
+        var overflow_count: usize = 0;
+        for (self.overflow) |char| {
+            if (char != 0) overflow_count += 1;
+        }
+        return overflow_count;
+    }
+    // pub fn removeLastOverFlowChar(self: *WordsState) usize {
+    //
+    // }
     pub fn init(allocator: std.mem.Allocator, word_slice: []const u8) !WordState {
         const chars_state: []CharState = try allocator.alloc(CharState, word_slice.len);
         @memset(chars_state, .toComplete);
@@ -225,22 +251,37 @@ const Printer = struct {
             if (force_color) |color| {
                 printChar(color, char);
             } else {
-                const color: Color = switch (word_state.char_states[char_idx]) {
-                    .toComplete => .gray,
-                    .valid => .correct,
-                    .invalid => .error_fg,
-                };
+                const color: Color = word_state.char_states[char_idx].toColor();
                 printChar(color, char);
             }
         }
     }
+
+    pub fn printCharAt(self: *const Printer, word_idx: usize, char_idx: usize, input: u8) void {
+        if (word_idx < self.words_state_ptr.word_slices.len and char_idx < self.words_state_ptr.word_slices[word_idx].len) {
+            const char_state: CharState = self.words_state_ptr.word_states[word_idx].char_states[char_idx];
+            const color: Color = char_state.toColor();
+            if (char_state == .invalid) {
+                printChar(color, input);
+            } else {
+                printChar(color, self.words_state_ptr.word_slices[word_idx][char_idx]);
+            }
+        }
+    }
+
+    pub fn printBackspace(self: *const Printer, word_idx: usize, char_idx: usize) void {
+        if (word_idx < self.words_state_ptr.word_slices.len and char_idx < self.words_state_ptr.word_slices[word_idx].len) {
+            const original_char = self.words_state_ptr.word_slices[word_idx][char_idx];
+            std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), original_char, Color.reset.toString() });
+        }
+    }
+    
     pub fn printGrayedSentence(self: *const Printer) void {
         for (self.words_state_ptr.word_states, 0..) |word_state, word_idx| {
             printWord(word_state, .gray);
             // print the space after the word
             if (word_idx < self.words_state_ptr.word_slices.len - 1)
                 printChar(.gray, ' ');
-                // printColoredChar(.gray, ' ');
         }
     }
     pub fn init(words_state_ptr: *const WordsState) Printer {
@@ -458,11 +499,15 @@ pub fn main() !void {
         // if (byte == '\x7f') {
         // if (byte == '\x08') {
         if (byte == 127) {
-            if (words_state.word_states[word_idx].overflow.len > 0) {
+            // if (words_state.word_states[word_idx].overflow.len > 0) {
+            if (words_state.word_states[word_idx].getFilledOverFlowLen() > 0) {
+                // char_idx -= 1;
+                // printer.printBackspace(word_idx, char_idx);
                 // overflow_chars -= 1;
                 // std.debug.print("\x1b[1D \x1b[1D", .{});
             } else if (char_idx > 0) {
                 char_idx -= 1;
+                printer.printBackspace(word_idx, char_idx);
                 // char_in_word -= 1;
                 // const target_char = words[current_word][char_in_word];
                 // std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
@@ -478,13 +523,28 @@ pub fn main() !void {
         if (byte == ' ') {
             // words_state.newPrint(word_idx, char_idx);
             // if (l)
+            if (word_idx < words_state.word_slices.len - 1) {
+//                 // Skip remaining chars in current word and the space
+//                 const remaining_chars = words[current_word].len - char_in_word;
+//                 if (remaining_chars > 0) {
+//                     std.debug.print("\x1b[{}C", .{remaining_chars});
+//                 }
+//                 std.debug.print("\x1b[1C", .{}); // skip the space
+//
+                word_idx += 1;
+                char_idx = 0;
+//                 current_word += 1;
+//                 char_in_word = 0;
+//                 overflow_chars = 0;
+            }
             printColoredChar(.gray, ' ');
             char_idx = 0;
             word_idx += 1;
         } else {
             // if (byte == words_state.word_states[word_idx].word_slice[char_idx]) {
             words_state.word_states[word_idx].updateCharAt(char_idx, byte);
-            words_state.newPrint(word_idx, char_idx);
+            printer.printCharAt(word_idx, char_idx, byte);
+            // words_state.newPrint(word_idx, char_idx);
             char_idx += 1;
         }
     }
