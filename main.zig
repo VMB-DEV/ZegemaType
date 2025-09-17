@@ -208,12 +208,47 @@ const WordState = struct {
     }
 };
 
-const Printing = struct {
-    pub fn printAChar() void {}
+const Printer = struct {
+    words_state_ptr: *const WordsState,
+
     pub fn printJumpToNextWord() void {}
     pub fn printBackSpace() void {}
     pub fn printOverflow() void {}
-}
+    // pub fn printWord(self: *Printer, word_idx: usize, force_color: ?Color = null) void {
+    // fn printWord(self: *Printer, word_slice: []const u8, force_color: ?Color) void {
+    // pub fn printChar(self: *const Printer, color: Color, char: u8) void {
+    pub fn printChar(color: Color, char: u8) void {
+        std.debug.print("{s}{c}{s}", .{ color.toString(), char, Color.reset.toString() });
+    }
+    pub fn printWord(word_state: WordState, force_color: ?Color) void {
+        for (word_state.word_slice, 0..) |char, char_idx| {
+            if (force_color) |color| {
+                printChar(color, char);
+            } else {
+                const color: Color = switch (word_state.char_states[char_idx]) {
+                    .toComplete => .gray,
+                    .valid => .correct,
+                    .invalid => .error_fg,
+                };
+                printChar(color, char);
+            }
+        }
+    }
+    pub fn printGrayedSentence(self: *const Printer) void {
+        for (self.words_state_ptr.word_states, 0..) |word_state, word_idx| {
+            printWord(word_state, .gray);
+            // print the space after the word
+            if (word_idx < self.words_state_ptr.word_slices.len - 1)
+                printChar(.gray, ' ');
+                // printColoredChar(.gray, ' ');
+        }
+    }
+    pub fn init(words_state_ptr: *const WordsState) Printer {
+        return Printer{
+            .words_state_ptr = words_state_ptr,
+        };
+    }
+};
 
 const WordsState = struct {
     word_states: []WordState,
@@ -397,6 +432,7 @@ pub fn main() !void {
 
     const number_of_words: comptime_int = 3;
     const words_state: WordsState = try WordsState.init(allocator, number_of_words);
+    const printer: Printer = Printer.init(&words_state);
 
 
     var buffer: [1]u8 = undefined;
@@ -405,7 +441,8 @@ pub fn main() !void {
     var char_idx: usize = 0;
 
     // words_state.print(word_idx, char_idx);
-    words_state.print0();
+    // words_state.print0();
+    printer.printGrayedSentence();
     std.debug.print("\x1b[{}D", .{words_state.total_length});
 
     while (esc_count < 2) {
