@@ -183,6 +183,9 @@ const WordState = struct {
         }
         return overflow_count;
     }
+    pub fn getLastCharIdxToFill() usize {
+
+    }
     // pub fn removeLastOverFlowChar(self: *WordsState) usize {
     //
     // }
@@ -237,7 +240,6 @@ const WordState = struct {
 const Printer = struct {
     words_state_ptr: *const WordsState,
 
-    pub fn printJumpToNextWord() void {}
     pub fn printBackSpace() void {}
     pub fn printOverflow() void {}
     // pub fn printWord(self: *Printer, word_idx: usize, force_color: ?Color = null) void {
@@ -275,7 +277,23 @@ const Printer = struct {
             std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), original_char, Color.reset.toString() });
         }
     }
-    
+
+    pub fn printJumpToPrecedentWord(self: *const Printer, word_idx: usize, char_idx: usize) void {
+        _ = char_idx;
+        _ = word_idx;
+        _ = self;
+        std.debug.print("\x1b[{}D", .{2});
+    }
+
+    pub fn printJumpToNextWord(self: *const Printer, word_idx: usize, char_idx: usize) void {
+        if (word_idx >= self.words_state_ptr.word_slices.len) return;
+        const remaining_chars = self.words_state_ptr.word_slices[word_idx].len - char_idx;
+        if (remaining_chars > 0) {
+            std.debug.print("\x1b[{}C", .{remaining_chars});
+        }
+        std.debug.print("\x1b[1C", .{}); // skip the space
+    }
+
     pub fn printGrayedSentence(self: *const Printer) void {
         for (self.words_state_ptr.word_states, 0..) |word_state, word_idx| {
             printWord(word_state, .gray);
@@ -284,6 +302,7 @@ const Printer = struct {
                 printChar(.gray, ' ');
         }
     }
+
     pub fn init(words_state_ptr: *const WordsState) Printer {
         return Printer{
             .words_state_ptr = words_state_ptr,
@@ -512,10 +531,13 @@ pub fn main() !void {
                 // const target_char = words[current_word][char_in_word];
                 // std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
             } else if (char_idx <= 0) {
-                if (word_idx == 0) {
+                if (word_idx <= 0) {
                     continue;
                 } else {
+                    printer.printJumpToPrecedentWord(word_idx, char_idx);
                     word_idx -= 1;
+                    // char_idx = words_state.word_states[word_idx].word_slice.len + words_state.word_states[word_idx].getFilledOverFlowLen();
+                    char_idx = words_state.word_states.getLastCharIdxToFill() ;
                 }
             }
             continue;
@@ -531,15 +553,13 @@ pub fn main() !void {
 //                 }
 //                 std.debug.print("\x1b[1C", .{}); // skip the space
 //
+                printer.printJumpToNextWord(word_idx, char_idx);
                 word_idx += 1;
                 char_idx = 0;
-//                 current_word += 1;
-//                 char_in_word = 0;
-//                 overflow_chars = 0;
             }
-            printColoredChar(.gray, ' ');
-            char_idx = 0;
-            word_idx += 1;
+            // printColoredChar(.gray, ' ');
+            // char_idx = 0;
+            // word_idx += 1;
         } else {
             // if (byte == words_state.word_states[word_idx].word_slice[char_idx]) {
             words_state.word_states[word_idx].updateCharAt(char_idx, byte);
