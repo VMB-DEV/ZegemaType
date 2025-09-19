@@ -175,6 +175,9 @@ const WordState = struct {
     char_states: []CharState,
     overflow: [10]u8,
 
+    pub fn charIndexValid(self: *WordState, char_idx: usize) bool {
+        return 0 < char_idx and char_idx < self.word_slice.len;
+    }
 
     pub fn getFilledOverFlowLen(self: *WordState) usize {
         var overflow_count: usize = 0;
@@ -183,8 +186,11 @@ const WordState = struct {
         }
         return overflow_count;
     }
-    pub fn getLastCharIdxToFill() usize {
-
+    pub fn getLastCharIdxToFill(self: *const WordState) usize {
+        for (self.char_states, 0..) |char_state, char_idx| {
+            if (char_state == .toComplete) return char_idx;
+        }
+        return self.char_states.len;
     }
     // pub fn removeLastOverFlowChar(self: *WordsState) usize {
     //
@@ -278,15 +284,23 @@ const Printer = struct {
         }
     }
 
-    pub fn printJumpToPrecedentWord(self: *const Printer, word_idx: usize, char_idx: usize) void {
-        _ = char_idx;
-        _ = word_idx;
-        _ = self;
-        std.debug.print("\x1b[{}D", .{2});
+    pub fn printJumpToPrecedentWordAndReturnNewCharIndex(self: *const Printer, word_idx: usize, char_idx: usize) !usize {
+        if (self.words_state_ptr.getWordState(word_idx - 1)) |p_word_state| {
+            var offset_idx = char_idx;
+            const p_offset_set = p_word_state.word_slice.len - 1 - p_word_state.getLastCharIdxToFill();
+            offset_idx += p_offset_set;
+            // offset_idx += 1;
+            offset_idx += 2;
+            std.debug.print("\x1b[{}D", .{offset_idx});
+            return p_word_state.getLastCharIdxToFill();
+        } else |e| {
+            return e;
+        }
     }
 
     pub fn printJumpToNextWord(self: *const Printer, word_idx: usize, char_idx: usize) void {
-        if (word_idx >= self.words_state_ptr.word_slices.len) return;
+        // if (!self.words_state_ptr.wordIndexValid(word_idx))
+        if (word_idx > self.words_state_ptr.word_slices.len) return;
         const remaining_chars = self.words_state_ptr.word_slices[word_idx].len - char_idx;
         if (remaining_chars > 0) {
             std.debug.print("\x1b[{}C", .{remaining_chars});
@@ -308,12 +322,36 @@ const Printer = struct {
             .words_state_ptr = words_state_ptr,
         };
     }
+
+    pub fn printIndexes(self: *const Printer, word_idx: usize, char_idx: usize) void {
+        _ = self;
+        std.debug.print("\x1b[s", .{}); // Save cursor position
+        std.debug.print("\x1b[1;1H", .{}); // Move to second line, first column
+        std.debug.print("\x1b[K", .{}); // Clear the line
+        std.debug.print("word_idx: {}, char_idx: {}", .{word_idx, char_idx});
+        std.debug.print("\x1b[u", .{}); // Restore cursor position
+    }
 };
 
 const WordsState = struct {
     word_states: []WordState,
     word_slices: [][]const u8,
     total_length: usize,
+
+    pub fn wordIndexValid(self: *const WordsState, word_idx: usize) bool {
+        return 0 < word_idx and word_idx < self.word_slices.len;
+    }
+
+    pub fn getWordState(self: *const WordsState, word_idx: usize) !WordState {
+        if (!self.wordIndexValid(word_idx)) return error.IndexOutOfBounds;
+        return self.word_states[word_idx];
+    }
+
+    pub fn getLastCharIdxToFill(self: *const WordsState, word_idx: usize) usize {
+        if (0 <= word_idx and word_idx < self.word_states.len) return 0;
+        const new_char_idx = if (self.getWordState(word_idx)) |word_state| word_state.getLastCharIdxToFill() else |_| 0;
+        return new_char_idx;
+    }
 
     pub fn init(allocator: std.mem.Allocator, number_of_words: usize) !WordsState {
         const word_slices: [][]const u8 = try getRandomWords(allocator, number_of_words);
@@ -527,18 +565,28 @@ pub fn main() !void {
             } else if (char_idx > 0) {
                 char_idx -= 1;
                 printer.printBackspace(word_idx, char_idx);
+                printer.printIndexes(word_idx, char_idx);
+                continue;
                 // char_in_word -= 1;
                 // const target_char = words[current_word][char_in_word];
                 // std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
-            } else if (char_idx <= 0) {
-                if (word_idx <= 0) {
-                    continue;
-                } else {
-                    printer.printJumpToPrecedentWord(word_idx, char_idx);
+            } else if (char_idx == 0) {
+                if (word_idx > 1) {
+                    char_idx = printer.printJumpToPrecedentWordAndReturnNewCharIndex(word_idx, char_idx) catch { continue; };
                     word_idx -= 1;
-                    // char_idx = words_state.word_states[word_idx].word_slice.len + words_state.word_states[word_idx].getFilledOverFlowLen();
-                    char_idx = words_state.word_states.getLastCharIdxToFill() ;
+                    printer.printIndexes(word_idx, char_idx);
+                    continue;
+                } else if (word_idx == 0) {
+                    continue;
                 }
+                // const new_char_idx = if (words_state.getWordState(word_idx)) |word_state| word_state.getLastCharIdxToFill() else |_| 0;
+                // const new_char_idx = words_state.getLastCharIdxToFill(word_idx);
+                // if (printer.printJumpToPrecedentWordAndReturnNewCharIndex(word_idx, char_idx)) |new_char_idx| {
+                // } else |_| {
+                //     continue;
+                // }
+            } else if (char_idx < 0) {
+                //todo: throw an error ?
             }
             continue;
         }
@@ -556,6 +604,8 @@ pub fn main() !void {
                 printer.printJumpToNextWord(word_idx, char_idx);
                 word_idx += 1;
                 char_idx = 0;
+                printer.printIndexes(word_idx, char_idx);
+                continue;
             }
             // printColoredChar(.gray, ' ');
             // char_idx = 0;
@@ -566,7 +616,10 @@ pub fn main() !void {
             printer.printCharAt(word_idx, char_idx, byte);
             // words_state.newPrint(word_idx, char_idx);
             char_idx += 1;
+            printer.printIndexes(word_idx, char_idx);
+            continue;
         }
+
     }
 }
 
