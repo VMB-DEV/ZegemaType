@@ -291,8 +291,8 @@ const Printer = struct {
     pub fn printJumpToPrecedentWordAndReturnNewCharIndex(self: *const Printer, word_idx: usize, char_idx: usize) !usize {
         if (self.words_state_ptr.getWordState(word_idx - 1)) |p_word_state| {
             var offset_idx = char_idx;
-            // const p_offset_set = p_word_state.word_slice.len - 1 - p_word_state.getLastCharIdxToFill();
-            const p_offset_set = p_word_state.word_slice.len - p_word_state.getLastCharIdxToFill();
+            const p_offset_set = p_word_state.word_slice.len - 1 - p_word_state.getLastCharIdxToFill();
+            // const p_offset_set = p_word_state.word_slice.len - p_word_state.getLastCharIdxToFill();
             offset_idx += p_offset_set;
             // offset_idx += 1;
             offset_idx += 2;
@@ -326,6 +326,18 @@ const Printer = struct {
         return Printer{
             .words_state_ptr = words_state_ptr,
         };
+    }
+
+    pub fn newPrint(self: *const Printer) void {
+        std.debug.print("\x1b[s", .{}); // Save cursor position
+        std.debug.print("\x1b[K", .{}); // Clear the line
+        for (self.words_state_ptr.word_states) |word_state | {
+            printWord(word_state, null);
+            printChar(.gray, ' ');
+        }
+        // std.debug.print("\x1b[{}C", .{1});
+        std.debug.print("\x1b[u", .{}); // Restore cursor position
+        std.debug.print("\x1b[1C", .{}); // skip the space
     }
 
     pub fn printIndexes(self: *const Printer, word_idx: usize, char_idx: usize) void {
@@ -399,16 +411,16 @@ const WordsState = struct {
         allocator.free(self.word_slices);
     }
 
-    pub fn newPrint(self: *const WordsState, word_idx: usize, char_idx: usize) void {
-        if (word_idx < self.word_slices.len and char_idx < self.word_slices[word_idx].len) {
-            const color: Color = switch (self.word_states[word_idx].char_states[char_idx]) {
-                .toComplete => .gray,
-                .valid => .correct,
-                .invalid => .error_fg,
-            };
-            printColoredChar(color, self.word_slices[word_idx][char_idx]);
-        }
-    }
+    // pub fn newPrint(self: *const WordsState, word_idx: usize, char_idx: usize) void {
+    //     if (word_idx < self.word_slices.len and char_idx < self.word_slices[word_idx].len) {
+    //         const color: Color = switch (self.word_states[word_idx].char_states[char_idx]) {
+    //             .toComplete => .gray,
+    //             .valid => .correct,
+    //             .invalid => .error_fg,
+    //         };
+    //         printColoredChar(color, self.word_slices[word_idx][char_idx]);
+    //     }
+    // }
     pub fn print(self: *const WordsState, word_idx: usize, char_idx: usize) void {
         std.debug.print("\x1b[?25l", .{}); // Hide cursor
 
@@ -629,124 +641,15 @@ pub fn main() !void {
             // char_idx = 0;
             // word_idx += 1;
         } else {
-            // if (byte == words_state.word_states[word_idx].word_slice[char_idx]) {
             words_state.word_states[word_idx].updateCharAt(char_idx, byte);
-            printer.printCharAt(word_idx, char_idx, byte);
-            // words_state.newPrint(word_idx, char_idx);
+            printer.newPrint();
+            // printer.printCharAt(word_idx, char_idx, byte);
             char_idx += 1;
-            printer.printIndexes(word_idx, char_idx);
+            // printer.printIndexes(word_idx, char_idx);
             continue;
         }
 
     }
 }
-
-// pub fn main2() !void {
-//     var arena  = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//
-//     const allocator = arena.allocator();
-//
-//     try disableEcho();
-//     defer enableEcho() catch {};
-//
-//     const numberOfWords: comptime_int = 10;
-//     const words: [][]const u8 = try getRandomWords(allocator, numberOfWords);
-//     // const charsState: *[]
-//     printGrayedWords(words);
-//
-//     var total_len: usize = 0;
-//     for (words) |word| total_len += word.len;
-//     total_len += words.len - 1; // spaces between words
-//     std.debug.print("\x1b[{}D", .{total_len});
-//
-//     var buffer: [1]u8 = undefined;
-//     var current_word: usize = 0;
-//     var char_in_word: usize = 0;
-//     var overflow_chars: usize = 0;
-//
-//     while (current_word < words.len) {
-//         const bytes_read = try std.fs.File.stdin().read(&buffer);
-//         if (bytes_read == 0) break;
-//         const byte = buffer[0];
-//
-//         // Handle backspace
-//         if (byte == '\x7f') {
-//             if (overflow_chars > 0) {
-//                 overflow_chars -= 1;
-//                 std.debug.print("\x1b[1D \x1b[1D", .{});
-//             } else if (char_in_word > 0) {
-//                 char_in_word -= 1;
-//                 const target_char = words[current_word][char_in_word];
-//                 std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
-//             }
-//             continue;
-//         }
-//
-//         // Handle space - move to next word
-//         if (byte == ' ') {
-//             if (current_word < words.len - 1) {
-//                 // Skip remaining chars in current word and the space
-//                 const remaining_chars = words[current_word].len - char_in_word;
-//                 if (remaining_chars > 0) {
-//                     std.debug.print("\x1b[{}C", .{remaining_chars});
-//                 }
-//                 std.debug.print("\x1b[1C", .{}); // skip the space
-//
-//                 current_word += 1;
-//                 char_in_word = 0;
-//                 overflow_chars = 0;
-//             }
-//             continue;
-//         }
-//         //todo: enter key behavior
-//
-//         // Handle regular character input
-//         if (char_in_word < words[current_word].len) {
-//             // Within word bounds
-//             if (byte == words[current_word][char_in_word]) {
-//                 printColoredChar(.correct, byte);
-//             } else {
-//                 printColoredChar(.error_fg, byte);
-//             }
-//             char_in_word += 1;
-//         } else {
-//             // Overflow - beyond word length
-//             printColoredChar(.error_bg, byte);
-//             overflow_chars += 1;
-//
-//             // // Move to beginning of line, clear entire line, and reprint everything
-//             // std.debug.print("\x1b[2K\x1b[G", .{}); // Clear entire line and move to beginning
-//             //
-//             // var idx_to_substract: usize = 0;
-//             // Reprint all words with current progress
-//             for (words, 0..) |word, word_idx| {
-//                 if (word_idx > 0) printColoredChar(.gray, ' ');
-//
-//                 if (word_idx < current_word) {
-//                     // Already completed words - show in correct color
-//                     printColoredString(.correct, word);
-//                 } else if (word_idx == current_word) {
-//                     // Current word - show typed part + overflow + remaining
-//                     for (word[0..char_in_word]) |c| {
-//                         printColoredChar(.correct, c);
-//                     }
-//                     // Show overflow characters that were typed
-//                     for (0..overflow_chars) |_| {
-//                         printColoredChar(.error_bg, 'X'); // Placeholder for overflow chars
-//                     }
-//                     // Show remaining part of current word in gray
-//                     if (char_in_word < word.len) {
-//                         printColoredString(.gray, word[char_in_word..]);
-//                     }
-//                 } else {
-//                     // Future words in gray
-//                     printColoredString(.gray, word);
-//                 }
-//             }
-//             std.debug.print("\x1b[{}D", .{total_len});
-//         }
-//     }
-// }
 
 pub const ALL_WORDS = [_][]const u8{ "i", "present", "my", "zig", "first", "program", "all", "software", "ai", "none", "all", "fast", "blazingly", "update", "upgrade", "improve", "understanding", "publication", "contact", "note", "hobby", "intervention", "discovery", "volcano", "trait", "balance", "criminal", "nerve", "dialect", "mutual", "terrace", "post", "lace", "tile", "tie", "exploit", "ancestor", "advance", "exchange", "building", "watch", "appreciate", "detective", "disagreement", "excavate", "experienced ", };
