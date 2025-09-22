@@ -291,7 +291,8 @@ const Printer = struct {
     pub fn printJumpToPrecedentWordAndReturnNewCharIndex(self: *const Printer, word_idx: usize, char_idx: usize) !usize {
         if (self.words_state_ptr.getWordState(word_idx - 1)) |p_word_state| {
             var offset_idx = char_idx;
-            const p_offset_set = p_word_state.word_slice.len - 1 - p_word_state.getLastCharIdxToFill();
+            // const p_offset_set = p_word_state.word_slice.len - 1 - p_word_state.getLastCharIdxToFill();
+            const p_offset_set = p_word_state.word_slice.len - p_word_state.getLastCharIdxToFill();
             offset_idx += p_offset_set;
             // offset_idx += 1;
             offset_idx += 2;
@@ -588,7 +589,7 @@ pub fn main() !void {
                 // const target_char = words[current_word][char_in_word];
                 // std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
             } else if (char_idx == 0) {
-                if (word_idx > 1) {
+                if (word_idx >= 1) {
                     char_idx = printer.printJumpToPrecedentWordAndReturnNewCharIndex(word_idx, char_idx) catch { continue; };
                     word_idx -= 1;
                     printer.printIndexes(word_idx, char_idx);
