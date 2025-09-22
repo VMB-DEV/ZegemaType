@@ -175,8 +175,8 @@ const WordState = struct {
     char_states: []CharState,
     overflow: [10]u8,
 
-    pub fn charIndexValid(self: *WordState, char_idx: usize) bool {
-        return 0 < char_idx and char_idx < self.word_slice.len;
+    pub fn charIndexValid(self: *const WordState, char_idx: usize) bool {
+        return 0 <= char_idx and char_idx < self.word_slice.len;
     }
 
     pub fn getFilledOverFlowLen(self: *WordState) usize {
@@ -191,6 +191,10 @@ const WordState = struct {
             if (char_state == .toComplete) return char_idx;
         }
         return self.char_states.len;
+    }
+    pub fn setCharStateAt(self: *WordState, char_idx: usize, char_state: CharState) !void {
+        if (!self.charIndexValid(char_idx)) return error.IndexOutOfBounds;
+        self.char_states[char_idx] = char_state;
     }
     // pub fn removeLastOverFlowChar(self: *WordsState) usize {
     //
@@ -324,11 +328,13 @@ const Printer = struct {
     }
 
     pub fn printIndexes(self: *const Printer, word_idx: usize, char_idx: usize) void {
-        _ = self;
+        // last_char_idx: usize = if (self.words_state_ptr.getWordState(word_idx)) |word_state| {word_state.getLastCharIdxToFill()}
+        const last_char_idx: usize = if (self.words_state_ptr.getWordState(word_idx)) |word_state| word_state.getLastCharIdxToFill() else |_| 42;
+        // self.words_state_ptr.getWordState(word_idx)
         std.debug.print("\x1b[s", .{}); // Save cursor position
         std.debug.print("\x1b[1;1H", .{}); // Move to second line, first column
         std.debug.print("\x1b[K", .{}); // Clear the line
-        std.debug.print("word_idx: {}, char_idx: {}", .{word_idx, char_idx});
+        std.debug.print("word_idx: {}, char_idx: {}, last_char_idx: {}", .{word_idx, char_idx, last_char_idx});
         std.debug.print("\x1b[u", .{}); // Restore cursor position
     }
 };
@@ -339,12 +345,20 @@ const WordsState = struct {
     total_length: usize,
 
     pub fn wordIndexValid(self: *const WordsState, word_idx: usize) bool {
-        return 0 < word_idx and word_idx < self.word_slices.len;
+        return 0 <= word_idx and word_idx < self.word_slices.len;
     }
 
     pub fn getWordState(self: *const WordsState, word_idx: usize) !WordState {
         if (!self.wordIndexValid(word_idx)) return error.IndexOutOfBounds;
         return self.word_states[word_idx];
+    }
+    // pub fn useWordState(self: *const WordsState, word_idx: usize) !*WordState {
+    //     if (!self.wordIndexValid(word_idx)) return error.IndexOutOfBounds;
+    //     return &self.word_states[word_idx];
+    // }
+    pub fn setCharStateAt(self: *const WordsState, word_idx: usize, char_idx: usize, char_state: CharState) !void {
+        if (!self.wordIndexValid(word_idx)) return error.IndexOutOfBounds;
+        return self.word_states[word_idx].setCharStateAt(char_idx, char_state);
     }
 
     pub fn getLastCharIdxToFill(self: *const WordsState, word_idx: usize) usize {
@@ -566,6 +580,9 @@ pub fn main() !void {
                 char_idx -= 1;
                 printer.printBackspace(word_idx, char_idx);
                 printer.printIndexes(word_idx, char_idx);
+                try words_state.setCharStateAt(word_idx, char_idx, .toComplete) ;
+                // if (words_state.useWordState(word_idx) catch null) |word_state| { word_state.char_states[char_idx] = .toComplete; }
+                // words_state.getWordState(word_idx).
                 continue;
                 // char_in_word -= 1;
                 // const target_char = words[current_word][char_in_word];
