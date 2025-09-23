@@ -291,11 +291,13 @@ const Printer = struct {
     pub fn printJumpToPrecedentWordAndReturnNewCharIndex(self: *const Printer, word_idx: usize, char_idx: usize) !usize {
         if (self.words_state_ptr.getWordState(word_idx - 1)) |p_word_state| {
             var offset_idx = char_idx;
-            const p_offset_set = p_word_state.word_slice.len - 1 - p_word_state.getLastCharIdxToFill();
+
+            const p_offset_set = p_word_state.word_slice.len - p_word_state.getLastCharIdxToFill();
+            // if (char_idx == 0) p_offset_set -= 1;
             // const p_offset_set = p_word_state.word_slice.len - p_word_state.getLastCharIdxToFill();
             offset_idx += p_offset_set;
-            // offset_idx += 1;
-            offset_idx += 2;
+            offset_idx += 1;
+            // offset_idx += 2;
             std.debug.print("\x1b[{}D", .{offset_idx});
             return p_word_state.getLastCharIdxToFill();
         } else |e| {
