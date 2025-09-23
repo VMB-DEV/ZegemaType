@@ -329,25 +329,38 @@ const Printer = struct {
     }
 
     pub fn newPrint(self: *const Printer) void {
-        std.debug.print("\x1b[s", .{}); // Save cursor position
-        std.debug.print("\x1b[K", .{}); // Clear the line
+        // _ = self;
+        // std.debug.print("\x1b[s", .{}); // Save cursor position
+        // std.debug.print("\x1b[K", .{}); // Clear the line
+        std.debug.print("\x1b[2K\x1b[G", .{}); // Clear entire line and go to beginning
         for (self.words_state_ptr.word_states) |word_state | {
+            // _ = word_state;
             printWord(word_state, null);
             printChar(.gray, ' ');
         }
-        // std.debug.print("\x1b[{}C", .{1});
         std.debug.print("\x1b[u", .{}); // Restore cursor position
-        std.debug.print("\x1b[1C", .{}); // skip the space
+            // std.debug.print("\x1b[{}C", .{1});
+
+        // Calculate and move to current typing position
+        // var cursor_pos: usize = 0;
+        // for (0..word_idx) |i| {
+        //     cursor_pos += self.words_state_ptr.word_slices[i].len + 1; // +1 for space
+        // }
+        // cursor_pos += char_idx;
+        // std.debug.print("\x1b[{}C", .{cursor_pos}); // Move cursor to typing position
     }
 
     pub fn printIndexes(self: *const Printer, word_idx: usize, char_idx: usize) void {
         // last_char_idx: usize = if (self.words_state_ptr.getWordState(word_idx)) |word_state| {word_state.getLastCharIdxToFill()}
-        const last_char_idx: usize = if (self.words_state_ptr.getWordState(word_idx)) |word_state| word_state.getLastCharIdxToFill() else |_| 42;
         // self.words_state_ptr.getWordState(word_idx)
         std.debug.print("\x1b[s", .{}); // Save cursor position
         std.debug.print("\x1b[1;1H", .{}); // Move to second line, first column
         std.debug.print("\x1b[K", .{}); // Clear the line
-        std.debug.print("word_idx: {}, char_idx: {}, last_char_idx: {}", .{word_idx, char_idx, last_char_idx});
+        std.debug.print("w{}, c{}  ", .{word_idx, char_idx});
+        for (self.words_state_ptr.word_states, 0..) |word_state, w_idx| {
+            // const last_char_idx: usize = if (self.words_state_ptr.getWordState(word_idx)) |word_state| word_state.getLastCharIdxToFill() else |_| 42;
+            std.debug.print("[{}, {}, {}]  ", .{w_idx, word_state.word_slice.len, word_state.getLastCharIdxToFill()});
+        }
         std.debug.print("\x1b[u", .{}); // Restore cursor position
     }
 };
@@ -411,16 +424,6 @@ const WordsState = struct {
         allocator.free(self.word_slices);
     }
 
-    // pub fn newPrint(self: *const WordsState, word_idx: usize, char_idx: usize) void {
-    //     if (word_idx < self.word_slices.len and char_idx < self.word_slices[word_idx].len) {
-    //         const color: Color = switch (self.word_states[word_idx].char_states[char_idx]) {
-    //             .toComplete => .gray,
-    //             .valid => .correct,
-    //             .invalid => .error_fg,
-    //         };
-    //         printColoredChar(color, self.word_slices[word_idx][char_idx]);
-    //     }
-    // }
     pub fn print(self: *const WordsState, word_idx: usize, char_idx: usize) void {
         std.debug.print("\x1b[?25l", .{}); // Hide cursor
 
@@ -571,6 +574,7 @@ pub fn main() !void {
     std.debug.print("\x1b[{}D", .{words_state.total_length});
 
     while (esc_count < 2) {
+        printer.printIndexes(word_idx, char_idx);
         const bytes_read = try std.fs.File.stdin().read(&buffer);
         if (bytes_read == 0) break;
         const byte = buffer[0];
@@ -642,13 +646,10 @@ pub fn main() !void {
             // word_idx += 1;
         } else {
             words_state.word_states[word_idx].updateCharAt(char_idx, byte);
-            printer.newPrint();
-            // printer.printCharAt(word_idx, char_idx, byte);
+            printer.printCharAt(word_idx, char_idx, byte);
             char_idx += 1;
-            // printer.printIndexes(word_idx, char_idx);
             continue;
         }
-
     }
 }
 
