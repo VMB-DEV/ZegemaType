@@ -1,6 +1,9 @@
 const std = @import("std");
 const posix = std.posix;
 
+//todo : fix the double keystroke like ctrl + backspace (bug when deleting letter by letter du to the fact ctrl is considered as an input)
+//todo : fix the overflow writing
+
 // Color enum with methods
 const Color = enum {
     gray,
