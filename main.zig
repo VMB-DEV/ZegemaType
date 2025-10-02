@@ -111,6 +111,11 @@ fn enableEcho() !void {
     termios.lflag.ICANON = true;
     try posix.tcsetattr(std.fs.File.stdin().handle, .NOW, termios);
 }
+
+fn isValidPunct(byte: u8) bool {
+    return std.mem.indexOfScalar(u8, ".,!?;:-'\"", byte) != null;
+}
+
 pub fn main() !void {
     var arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -146,10 +151,10 @@ pub fn main() !void {
             esc_count += 1;
         }
         // backspace
-        // if (byte == '\x7f') {
-        // if (byte == '\x08') {
         if (byte == 127) {
-            // if (words_state_instance.word_states[word_idx].overflow.len > 0) {
+            // if (byte == '\x7f') {
+            // if (byte == '\x08') {
+                // if (words_state_instance.word_states[word_idx].overflow.len > 0) {
             if (words_state_instance.word_states[word_idx].getFilledOverFlowLen() > 0) {
                 // char_idx -= 1;
                 // printer_instance.printBackspace(word_idx, char_idx);
@@ -208,7 +213,7 @@ pub fn main() !void {
             // printColoredChar(.gray, ' ');
             // char_idx = 0;
             // word_idx += 1;
-        } else {
+        } else if (std.ascii.isAlphabetic(byte) or isValidPunct(byte)) {
             words_state_instance.word_states[word_idx].updateCharAt(char_idx, byte);
             printer_instance.printCharAt(word_idx, char_idx, byte);
             char_idx += 1;
