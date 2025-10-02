@@ -33,9 +33,10 @@ pub const WordsState = struct {
         return 0 <= word_idx and word_idx < self.word_slices.len;
     }
 
-    pub fn getWordState(self: *const WordsState, word_idx: usize) !WordState {
+    pub fn getWordState(self: *const WordsState, word_idx: usize) !*const WordState {
+    // pub fn getWordState(self: *const WordsState, word_idx: usize) *const WordState {
         if (!self.wordIndexValid(word_idx)) return error.IndexOutOfBounds;
-        return self.word_states[word_idx];
+        return &self.word_states[word_idx];
     }
 
     pub fn setCharStateAt(self: *const WordsState, word_idx: usize, char_idx: usize, char_state: CharState) !void {

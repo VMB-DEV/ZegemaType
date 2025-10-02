@@ -1,14 +1,14 @@
 const std = @import("std");
 const posix = std.posix;
 const color = @import("color.zig");
-const word_state = @import("word_state.zig");
-const words_state = @import("words_state.zig");
+const word_state_file = @import("word_state.zig");
+const words_state_file = @import("words_state.zig");
 const printer = @import("printer.zig");
 
 const Color = color.Color;
-const WordState = word_state.WordState;
-const CharState = word_state.CharState;
-const WordsState = words_state.WordsState;
+const WordState = word_state_file.WordState;
+const CharState = word_state_file.CharState;
+const WordsState = words_state_file.WordsState;
 const Printer = printer.Printer;
 
 //todo : fix the double keystroke like ctrl + backspace (bug when deleting letter by letter du to the fact ctrl is considered as an input)
@@ -19,13 +19,13 @@ test "getRandomWords returns correct number of words" {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const words = try words_state.getRandomWords(allocator, 5);
+    const words = try words_state_file.getRandomWords(allocator, 5);
     try std.testing.expect(words.len == 5);
 
-    const single_word = try words_state.getRandomWords(allocator, 1);
+    const single_word = try words_state_file.getRandomWords(allocator, 1);
     try std.testing.expect(single_word.len == 1);
 
-    const many_words = try words_state.getRandomWords(allocator, 50);
+    const many_words = try words_state_file.getRandomWords(allocator, 50);
     try std.testing.expect(many_words.len == 50);
 }
 
@@ -34,7 +34,7 @@ test "getRandomWords returns valid word pointers" {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const words = try words_state.getRandomWords(allocator, 10);
+    const words = try words_state_file.getRandomWords(allocator, 10);
 
     // Check each word pointer is valid and points to a word from ALL_WORDS
     for (words) |word| {
@@ -42,7 +42,7 @@ test "getRandomWords returns valid word pointers" {
 
         // Verify the word exists in ALL_WORDS
         var found = false;
-        for (words_state.ALL_WORDS) |dict_word| {
+        for (words_state_file.ALL_WORDS) |dict_word| {
             if (std.mem.eql(u8, word, dict_word)) {
                 found = true;
                 break;
@@ -57,7 +57,7 @@ test "getRandomWords handles zero words" {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const words = try words_state.getRandomWords(allocator, 0);
+    const words = try words_state_file.getRandomWords(allocator, 0);
     try std.testing.expect(words.len == 0);
 }
 
@@ -66,8 +66,8 @@ test "getRandomWords produces different results across calls" {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const words1 = try words_state.getRandomWords(allocator, 10);
-    const words2 = try words_state.getRandomWords(allocator, 10);
+    const words1 = try words_state_file.getRandomWords(allocator, 10);
+    const words2 = try words_state_file.getRandomWords(allocator, 10);
 
     // While it's theoretically possible for random results to be identical,
     // with 44 words in the dictionary and 10 selections, it's very unlikely
@@ -87,7 +87,7 @@ test "getRandomWords memory allocation" {
     const allocator = arena.allocator();
 
     // Test that memory is properly allocated
-    const words = try words_state.getRandomWords(allocator, 3);
+    const words = try words_state_file.getRandomWords(allocator, 3);
     try std.testing.expect(words.len == 3);
 
     // Verify we can access all word data
@@ -126,8 +126,8 @@ pub fn main() !void {
     defer enableEcho() catch {};
 
     const number_of_words: comptime_int = 3;
-    const words_state_instance: WordsState = try WordsState.init(allocator, number_of_words);
-    const printer_instance: Printer = Printer.init(&words_state_instance);
+    const words_state: WordsState = try WordsState.init(allocator, number_of_words);
+    const printer_instance: Printer = Printer.init(&words_state);
 
 
     var buffer: [1]u8 = undefined;
@@ -135,10 +135,10 @@ pub fn main() !void {
     var word_idx: usize = 0;
     var char_idx: usize = 0;
 
-    // words_state_instance.print(word_idx, char_idx);
-    // words_state_instance.print0();
+    // words_state.print(word_idx, char_idx);
+    // words_state.print0();
     printer_instance.printGrayedSentence();
-    std.debug.print("\x1b[{}D", .{words_state_instance.total_length});
+    std.debug.print("\x1b[{}D", .{words_state.total_length});
 
     while (esc_count < 2) {
         printer_instance.printIndexes(word_idx, char_idx);
@@ -154,8 +154,8 @@ pub fn main() !void {
         if (byte == 127) {
             // if (byte == '\x7f') {
             // if (byte == '\x08') {
-                // if (words_state_instance.word_states[word_idx].overflow.len > 0) {
-            if (words_state_instance.word_states[word_idx].getFilledOverFlowLen() > 0) {
+                // if (words_state.word_states[word_idx].overflow.len > 0) {
+            if (words_state.word_states[word_idx].getFilledOverFlowLen() > 0) {
                 // char_idx -= 1;
                 // printer_instance.printBackspace(word_idx, char_idx);
                 // overflow_chars -= 1;
@@ -164,9 +164,9 @@ pub fn main() !void {
                 char_idx -= 1;
                 printer_instance.printBackspace(word_idx, char_idx);
                 printer_instance.printIndexes(word_idx, char_idx);
-                try words_state_instance.setCharStateAt(word_idx, char_idx, .toComplete);
-                // if (words_state_instance.useWordState(word_idx) catch null) |word_state| { word_state.char_states[char_idx] = .toComplete; }
-                // words_state_instance.getWordState(word_idx).
+                try words_state.setCharStateAt(word_idx, char_idx, .toComplete);
+                // if (words_state.useWordState(word_idx) catch null) |words_state| { words_state.char_states[char_idx] = .toComplete; }
+                // words_state.getWordState(word_idx).
                 continue;
                 // char_in_word -= 1;
                 // const target_char = words[current_word][char_in_word];
@@ -182,8 +182,8 @@ pub fn main() !void {
                 } else if (word_idx == 0) {
                     continue;
                 }
-                // const new_char_idx = if (words_state_instance.getWordState(word_idx)) |word_state| word_state.getLastCharIdxToFill() else |_| 0;
-                // const new_char_idx = words_state_instance.getLastCharIdxToFill(word_idx);
+                // const new_char_idx = if (words_state.getWordState(word_idx)) |words_state| words_state.getLastCharIdxToFill() else |_| 0;
+                // const new_char_idx = words_state.getLastCharIdxToFill(word_idx);
                 // if (printer_instance.printJumpToPrecedentWordAndReturnNewCharIndex(word_idx, char_idx)) |new_char_idx| {
                 // } else |_| {
                 //     continue;
@@ -194,9 +194,9 @@ pub fn main() !void {
             continue;
         }
         if (byte == ' ') {
-            // words_state_instance.newPrint(word_idx, char_idx);
+            // words_state.newPrint(word_idx, char_idx);
             // if (l)
-            if (word_idx < words_state_instance.word_slices.len - 1) {
+            if (word_idx < words_state.word_slices.len - 1) {
                 //                 // Skip remaining chars in current word and the space
                 //                 const remaining_chars = words[current_word].len - char_in_word;
                 //                 if (remaining_chars > 0) {
@@ -214,9 +214,12 @@ pub fn main() !void {
             // char_idx = 0;
             // word_idx += 1;
         } else if (std.ascii.isAlphabetic(byte) or isValidPunct(byte)) {
-            words_state_instance.word_states[word_idx].updateCharAt(char_idx, byte);
-            printer_instance.printCharAt(word_idx, char_idx, byte);
-            char_idx += 1;
+            const wrd_state_ptr: ?* const WordState= words_state.getWordState(word_idx) catch null;
+            if (wrd_state_ptr) |word_state_ptr| {
+                words_state.word_states[word_idx].updateCharAt(char_idx, byte);
+                printer_instance.printCharAt(word_idx, char_idx, byte);
+                char_idx += 1;
+            }
             continue;
         }
     }
