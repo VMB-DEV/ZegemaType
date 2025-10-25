@@ -98,9 +98,9 @@ pub const Printer = struct {
         std.debug.print("\x1b[s", .{}); // Save cursor position
         std.debug.print("\x1b[1;1H", .{}); // Move to second line, first column
         std.debug.print("\x1b[K", .{}); // Clear the line
-        std.debug.print("w{}, c{}  ", .{ word_idx, char_idx });
-        for (self.words_state_ptr.word_states, 0..) |word_state_val, w_idx| {
-            std.debug.print("[{}, {}, {}]  ", .{ w_idx, word_state_val.word_slice.len, word_state_val.getLastCharIdxToFill() });
+        std.debug.print("w{}-c{} : ", .{ word_idx, char_idx });
+        for (self.words_state_ptr.word_states, 0..) |*word_state_val, w_idx| {
+            std.debug.print("[{}, {}, {}, {}]  ", .{ w_idx, word_state_val.word_slice.len, word_state_val.getLastCharIdxToFill(), word_state_val.getFilledOverFlowLen() });
         }
         std.debug.print("\x1b[u", .{}); // Restore cursor position
     }

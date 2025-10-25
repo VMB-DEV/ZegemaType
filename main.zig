@@ -11,8 +11,11 @@ const CharState = word_state_file.CharState;
 const WordsState = words_state_file.WordsState;
 const Printer = printer.Printer;
 
-//todo : fix the double keystroke like ctrl + backspace (bug when deleting letter by letter du to the fact ctrl is considered as an input)
 //todo : fix the overflow writing
+//todo : fix the double keystroke like ctrl + backspace (bug when deleting letter by letter du to the fact ctrl is considered as an input)
+//todo : calculate speed
+//todo : display speed with random sentence
+//todo : find a way to display this
 
 test "getRandomWords returns correct number of words" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -214,12 +217,12 @@ pub fn main() !void {
             // char_idx = 0;
             // word_idx += 1;
         } else if (std.ascii.isAlphabetic(byte) or isValidPunct(byte)) {
-            const wrd_state_ptr: ?* const WordState= words_state.getWordState(word_idx) catch null;
-            if (wrd_state_ptr) |word_state_ptr| {
-                words_state.word_states[word_idx].updateCharAt(char_idx, byte);
-                printer_instance.printCharAt(word_idx, char_idx, byte);
-                char_idx += 1;
-            }
+            // const wrd_state_ptr: ?* const WordState= words_state.getWordState(word_idx) catch null;
+            // if (wrd_state_ptr) {
+            const indexOverflow: usize = words_state.word_states[word_idx].updateCharAt(char_idx, byte);
+            printer_instance.printCharAt(word_idx, char_idx, byte);
+            char_idx += indexOverflow;
+            // }
             continue;
         }
     }

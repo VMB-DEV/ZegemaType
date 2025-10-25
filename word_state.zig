@@ -60,7 +60,7 @@ pub const WordState = struct {
         allocator.free(self.char_states);
     }
 
-    pub fn updateCharAt(self: *WordState, index: usize, typed_char: u8) void {
+    pub fn updateCharAt(self: *WordState, index: usize, typed_char: u8) usize {
         if (index < self.word_slice.len) {
             // Update character state within word bounds
             if (self.word_slice[index] == typed_char) {
@@ -68,11 +68,13 @@ pub const WordState = struct {
             } else {
                 self.char_states[index] = .invalid;
             }
+            return 1;
         } else {
             // Overflow case - increment overflow counter
             const overflow_idx = index - self.word_slice.len;
-            if (overflow_idx > 9) return;
+            if (overflow_idx > 9) return 0;
             self.overflow[overflow_idx] = typed_char;
+            return 0;
         }
     }
 
