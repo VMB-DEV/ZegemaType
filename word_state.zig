@@ -16,15 +16,19 @@ pub const CharState = enum {
     }
 };
 
+
+const MAX_CHARS_OVERFLOW: comptime_int = 10;
+
 pub const WordState = struct {
     word_slice: []const u8,
     char_states: []CharState,
-    overflow: [10]u8,
+    overflow: [MAX_CHARS_OVERFLOW]u8,
 
     pub fn charIndexValid(self: *const WordState, char_idx: usize) bool {
         return 0 <= char_idx and char_idx < self.word_slice.len;
     }
 
+    /// This function will return the current overflow len of characters
     pub fn getFilledOverFlowLen(self: *WordState) usize {
         var overflow_count: usize = 0;
         for (self.overflow) |char| {
@@ -38,6 +42,17 @@ pub const WordState = struct {
             if (char_state == .toComplete) return char_idx;
         }
         return self.char_states.len;
+    }
+
+    pub fn removeLastOverflow(self: *WordState) !void {
+        const overFlowLen: usize = self.getLastCharIdxToFill();
+        if (overFlowLen < 0 or MAX_CHARS_OVERFLOW >= overFlowLen) return error.IndexOutOfBounds;
+        self.overflow[self.getLastCharIdxToFill()] = 0;
+        // const
+        // for (self.overflow, 0..) |*char, i| {
+        //     if (char == 0)
+        // }
+        // self.overflow[]
     }
 
     pub fn setCharStateAt(self: *WordState, char_idx: usize, char_state: CharState) !void {
@@ -71,8 +86,9 @@ pub const WordState = struct {
             return 1;
         } else {
             // Overflow case - increment overflow counter
-            const overflow_idx = index - self.word_slice.len;
-            if (overflow_idx > 9) return 0;
+            // const overflow_idx = index - self.word_slice.len;
+            const overflow_idx = self.getFilledOverFlowLen();
+            if (overflow_idx > MAX_CHARS_OVERFLOW - 1) return 0;
             self.overflow[overflow_idx] = typed_char;
             return 0;
         }

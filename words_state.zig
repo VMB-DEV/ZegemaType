@@ -39,6 +39,13 @@ pub const WordsState = struct {
         return &self.word_states[word_idx];
     }
 
+    pub fn removeLastOverflow(self: *const WordsState, word_idx: usize) !void {
+        if (!self.wordIndexValid(word_idx)) return error.IndexOutOfBounds;
+        try self.word_states[word_idx].removeLastOverflow();
+        // const overFlowLen: usize = self.word_states[word_idx].getLastCharIdxToFill();
+        // if (overFlowLen < 0 or word_state.MAX_CHARS_OVERFLOW >= overFlowLen) return error.IndexOutOfBounds;
+    }
+
     pub fn setCharStateAt(self: *const WordsState, word_idx: usize, char_idx: usize, char_state: CharState) !void {
         if (!self.wordIndexValid(word_idx)) return error.IndexOutOfBounds;
         return self.word_states[word_idx].setCharStateAt(char_idx, char_state);
