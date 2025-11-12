@@ -221,7 +221,11 @@ pub fn main() !void {
             // const wrd_state_ptr: ?* const WordState= words_state.getWordState(word_idx) catch null;
             // if (wrd_state_ptr) {
             const indexOverflow: usize = words_state.word_states[word_idx].updateCharAt(char_idx, byte);
-            printer_instance.printCharAt(word_idx, char_idx, byte);
+            // if (indexOverflow == 0) {
+                printer_instance.printCharAt(word_idx, char_idx, byte);
+            // } else {
+                printer_instance.printOverflow(word_idx, byte);
+            // }
             char_idx += indexOverflow;
             // }
             continue;

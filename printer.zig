@@ -10,9 +10,7 @@ const WordsState = words_state.WordsState;
 pub const Printer = struct {
     words_state_ptr: *const WordsState,
 
-    pub fn printBackSpace() void {}
-    pub fn printOverflow() void {}
-
+    // pub fn printBackSpace() void {}
     pub fn printChar(char_color: Color, char: u8) void {
         std.debug.print("{s}{c}{s}", .{ char_color.toString(), char, Color.reset.toString() });
     }
@@ -37,6 +35,12 @@ pub const Printer = struct {
             } else {
                 printChar(char_color, self.words_state_ptr.word_slices[word_idx][char_idx]);
             }
+        }
+    }
+
+    pub fn printOverflow(self: *const Printer, word_idx: usize, input: u8) void {
+        if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
+            printChar(.error_bg, input);
         }
     }
 
