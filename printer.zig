@@ -38,9 +38,27 @@ pub const Printer = struct {
         }
     }
 
+    // pub fn printOverflow(self: *const Printer, word_idx: usize, char_idx: usize, input: u8) void {
     pub fn printOverflow(self: *const Printer, word_idx: usize, input: u8) void {
         if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
             printChar(.error_bg, input);
+            Ansi.saveCursorPosition();
+            // std.debug.print("\x1b[s", .{}); // Save cursor position
+            // if (self.words_state_ptr.word_states.len < word_idx + 1)
+            var offset: usize = 0;
+            for (self.words_state_ptr.word_states, 0..) |word_state_val, word_idx_val| {
+            // for (self.words_state_ptr.word_states, 0..) |word_state_val| {
+                if (word_idx_val <= word_idx) continue;
+                printChar(.gray, ' ');
+                printWord(word_state_val, .gray);
+                offset += 1 + word_state_val.word_slice.len;
+            }
+            Ansi.restorCursorPosition();
+            // std.debug.print("\x1b[u", .{}); // Restore cursor position
+                                            //
+            // printWord(self.words_state_ptr.word_states[word_idx + 1], .gray);
+            // self.printCharAt(word_idx: usize, char_idx: usize, input: u8)
+            // self.printJumpToNextWord(word_idx, char_idx );
         }
     }
 
@@ -99,13 +117,24 @@ pub const Printer = struct {
     }
 
     pub fn printIndexes(self: *const Printer, word_idx: usize, char_idx: usize) void {
-        std.debug.print("\x1b[s", .{}); // Save cursor position
+        Ansi.saveCursorPosition();
+        // std.debug.print("\x1b[s", .{}); // Save cursor position
         std.debug.print("\x1b[1;1H", .{}); // Move to second line, first column
         std.debug.print("\x1b[K", .{}); // Clear the line
         std.debug.print("w{}-c{}-o{}: ", .{ word_idx, char_idx,  self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen()});
         for (self.words_state_ptr.word_states, 0..) |*word_state_val, w_idx| {
             std.debug.print("[{}, {}, {}, {}]  ", .{ w_idx, word_state_val.word_slice.len, word_state_val.getLastCharIdxToFill(), word_state_val.getFilledOverFlowLen() });
         }
-        std.debug.print("\x1b[u", .{}); // Restore cursor position
+        // std.debug.print("\x1b[u", .{}); // Restore cursor position
+        Ansi.restorCursorPosition();
+    }
+};
+
+pub const Ansi = struct {
+    pub fn saveCursorPosition() void {
+        std.debug.print("\x1b[s", .{});
+    }
+    pub fn restorCursorPosition() void {
+        std.debug.print("\x1b[u", .{});
     }
 };

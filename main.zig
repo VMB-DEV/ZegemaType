@@ -224,6 +224,7 @@ pub fn main() !void {
             // if (indexOverflow == 0) {
                 printer_instance.printCharAt(word_idx, char_idx, byte);
             // } else {
+                // printer_instance.printOverflow(word_idx, char_idx, byte);
                 printer_instance.printOverflow(word_idx, byte);
             // }
             char_idx += indexOverflow;
