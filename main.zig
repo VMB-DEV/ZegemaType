@@ -160,7 +160,7 @@ pub fn main() !void {
                 // if (words_state.word_states[word_idx].overflow.len > 0) {
             if (words_state.word_states[word_idx].getFilledOverFlowLen() > 0) {
                 printer_instance.printBackspace(word_idx, char_idx);
-                // printer_instance.printOverflow(word_idx, );
+                printer_instance.printOverflowAfterBackspace(word_idx, byte);
                 try words_state.removeLastOverflow(word_idx);
                 // char_idx -= 1;
                 // printer_instance.printBackspace(word_idx, char_idx);

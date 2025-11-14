@@ -17,6 +17,7 @@ pub const Printer = struct {
 
     pub fn printWord(word_state_val: WordState, force_color: ?Color) void {
         for (word_state_val.word_slice, 0..) |char, char_idx| {
+            if (char_idx > word_state_val.word_slice.len - 1)  break;
             if (force_color) |char_color| {
                 printChar(char_color, char);
             } else {
@@ -37,7 +38,22 @@ pub const Printer = struct {
             }
         }
     }
-
+    pub fn printOverflowAfterBackspace(self: *const Printer, word_idx: usize, input: u8) void {
+        if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
+            printChar(.error_bg, input);
+            Ansi.saveCursorPosition();
+            Ansi.hideCursor();
+            var offset: usize = 0;
+            for (self.words_state_ptr.word_states, 0..) |word_state_val, word_idx_val| {
+                if (word_idx_val <= word_idx) continue;
+                printChar(.gray, ' ');
+                printWord(word_state_val, .gray);
+                offset += 1 + word_state_val.word_slice.len;
+            }
+            Ansi.restorCursorPosition();
+            Ansi.showCursor();
+        }
+    }
     // pub fn printOverflow(self: *const Printer, word_idx: usize, char_idx: usize, input: u8) void {
     // pub fn printOverflow(self: *const Printer, word_idx: usize, input: ?u8) void {
     pub fn printOverflow(self: *const Printer, word_idx: usize, input: u8) void {
