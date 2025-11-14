@@ -39,8 +39,10 @@ pub const Printer = struct {
     }
 
     // pub fn printOverflow(self: *const Printer, word_idx: usize, char_idx: usize, input: u8) void {
+    // pub fn printOverflow(self: *const Printer, word_idx: usize, input: ?u8) void {
     pub fn printOverflow(self: *const Printer, word_idx: usize, input: u8) void {
         if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
+            // if (input) |actual_input| printChar(.error_bg, actual_input);
             printChar(.error_bg, input);
             Ansi.saveCursorPosition();
             Ansi.hideCursor();
@@ -65,7 +67,11 @@ pub const Printer = struct {
     }
 
     pub fn printBackspace(self: *const Printer, word_idx: usize, char_idx: usize) void {
-        if (word_idx < self.words_state_ptr.word_slices.len and char_idx < self.words_state_ptr.word_slices[word_idx].len) {
+        if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
+            // const overflowLen: usize = self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen();
+            // self.words_state_ptr.word_states[word_idx].se
+            std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), ' ', Color.reset.toString() });
+        } else if (word_idx < self.words_state_ptr.word_slices.len and char_idx < self.words_state_ptr.word_slices[word_idx].len) {
             const original_char = self.words_state_ptr.word_slices[word_idx][char_idx];
             std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), original_char, Color.reset.toString() });
         }

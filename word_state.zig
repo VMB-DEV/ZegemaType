@@ -45,16 +45,19 @@ pub const WordState = struct {
     }
 
     pub fn removeLastOverflow(self: *WordState) !void {
-        const overFlowLen: usize = self.getLastCharIdxToFill();
-        // if (overFlowLen = ) return error.IndexOutOfBounds;
-        // if (overFlowLen < 0) return error.IndexOutOfBounds;
-        if (overFlowLen < 0 or MAX_CHARS_OVERFLOW <= overFlowLen) return error.IndexOutOfBounds;
-        self.overflow[self.getLastCharIdxToFill()] = 0;
-        // const
-        // for (self.overflow, 0..) |*char, i| {
-        //     if (char == 0)
-        // }
-        // self.overflow[]
+        // const overFlowLen: usize = self.getLastCharIdxToFill();
+        // if (overFlowLen < 0 or MAX_CHARS_OVERFLOW <= overFlowLen) return error.IndexOutOfBounds;
+        // self.overflow[self.getLastCharIdxToFill()] = 0;
+
+        var i: usize = self.overflow.len;
+        while (i > 0) {
+            i -= 1;
+            if (self.overflow[i] != 0) {
+                self.overflow[i] = 0;
+                return;
+            }
+        }
+        return error.NoOverflowToRemove;
     }
 
     pub fn setCharStateAt(self: *WordState, char_idx: usize, char_state: CharState) !void {
