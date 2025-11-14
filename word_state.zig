@@ -46,7 +46,9 @@ pub const WordState = struct {
 
     pub fn removeLastOverflow(self: *WordState) !void {
         const overFlowLen: usize = self.getLastCharIdxToFill();
-        if (overFlowLen < 0 or MAX_CHARS_OVERFLOW >= overFlowLen) return error.IndexOutOfBounds;
+        // if (overFlowLen = ) return error.IndexOutOfBounds;
+        // if (overFlowLen < 0) return error.IndexOutOfBounds;
+        if (overFlowLen < 0 or MAX_CHARS_OVERFLOW <= overFlowLen) return error.IndexOutOfBounds;
         self.overflow[self.getLastCharIdxToFill()] = 0;
         // const
         // for (self.overflow, 0..) |*char, i| {
@@ -67,7 +69,7 @@ pub const WordState = struct {
         return WordState{
             .word_slice = word_slice,
             .char_states = chars_state,
-            .overflow = [_]u8{0} ** 10,
+            .overflow = [_]u8{0} ** MAX_CHARS_OVERFLOW,
         };
     }
 
@@ -75,7 +77,7 @@ pub const WordState = struct {
         allocator.free(self.char_states);
     }
 
-    pub fn updateCharAt(self: *WordState, index: usize, typed_char: u8) usize {
+    pub fn updateCharAt(self: *WordState, index: usize, typed_char: u8) !usize {
         if (index < self.word_slice.len) {
             // Update character state within word bounds
             if (self.word_slice[index] == typed_char) {
@@ -88,7 +90,7 @@ pub const WordState = struct {
             // Overflow case - increment overflow counter
             // const overflow_idx = index - self.word_slice.len;
             const overflow_idx = self.getFilledOverFlowLen();
-            if (overflow_idx > MAX_CHARS_OVERFLOW - 1) return 0;
+            if (overflow_idx >= MAX_CHARS_OVERFLOW - 1) return error.MaxOverflowReached;
             self.overflow[overflow_idx] = typed_char;
             return 0;
         }

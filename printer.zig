@@ -43,6 +43,7 @@ pub const Printer = struct {
         if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
             printChar(.error_bg, input);
             Ansi.saveCursorPosition();
+            Ansi.hideCursor();
             // std.debug.print("\x1b[s", .{}); // Save cursor position
             // if (self.words_state_ptr.word_states.len < word_idx + 1)
             var offset: usize = 0;
@@ -54,6 +55,7 @@ pub const Printer = struct {
                 offset += 1 + word_state_val.word_slice.len;
             }
             Ansi.restorCursorPosition();
+            Ansi.showCursor();
             // std.debug.print("\x1b[u", .{}); // Restore cursor position
                                             //
             // printWord(self.words_state_ptr.word_states[word_idx + 1], .gray);
@@ -136,5 +138,11 @@ pub const Ansi = struct {
     }
     pub fn restorCursorPosition() void {
         std.debug.print("\x1b[u", .{});
+    }
+    pub fn hideCursor() void {
+        std.debug.print("\x1b[?25l", .{});
+    }
+    pub fn showCursor() void {
+        std.debug.print("\x1b[?25h", .{});
     }
 };
