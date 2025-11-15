@@ -10,7 +10,6 @@ const WordsState = words_state.WordsState;
 pub const Printer = struct {
     words_state_ptr: *const WordsState,
 
-    // pub fn printBackSpace() void {}
     pub fn printChar(char_color: Color, char: u8) void {
         std.debug.print("{s}{c}{s}", .{ char_color.toString(), char, Color.reset.toString() });
     }
@@ -59,8 +58,6 @@ pub const Printer = struct {
 
     pub fn printBackspace(self: *const Printer, word_idx: usize, char_idx: usize) void {
         if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
-            // const overflowLen: usize = self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen();
-            // self.words_state_ptr.word_states[word_idx].se
             std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), ' ', Color.reset.toString() });
         } else if (word_idx < self.words_state_ptr.word_slices.len and char_idx < self.words_state_ptr.word_slices[word_idx].len) {
             const original_char = self.words_state_ptr.word_slices[word_idx][char_idx];
@@ -117,14 +114,12 @@ pub const Printer = struct {
 
     pub fn printIndexes(self: *const Printer, word_idx: usize, char_idx: usize) void {
         Ansi.saveCursorPosition();
-        // std.debug.print("\x1b[s", .{}); // Save cursor position
         std.debug.print("\x1b[1;1H", .{}); // Move to second line, first column
         std.debug.print("\x1b[K", .{}); // Clear the line
         std.debug.print("w{}-c{}-o{}: ", .{ word_idx, char_idx,  self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen()});
         for (self.words_state_ptr.word_states, 0..) |*word_state_val, w_idx| {
             std.debug.print("[{}, {}, {}, {}]  ", .{ w_idx, word_state_val.word_slice.len, word_state_val.getLastCharIdxToFill(), word_state_val.getFilledOverFlowLen() });
         }
-        // std.debug.print("\x1b[u", .{}); // Restore cursor position
         Ansi.restorCursorPosition();
     }
 };

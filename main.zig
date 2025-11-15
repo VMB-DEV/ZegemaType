@@ -128,7 +128,7 @@ pub fn main() !void {
     try disableEcho();
     defer enableEcho() catch {};
 
-    const number_of_words: comptime_int = 3;
+    const number_of_words: comptime_int = 10;
     const words_state: WordsState = try WordsState.init(allocator, number_of_words);
     const printer_instance: Printer = Printer.init(&words_state);
 
@@ -138,8 +138,6 @@ pub fn main() !void {
     var word_idx: usize = 0;
     var char_idx: usize = 0;
 
-    // words_state.print(word_idx, char_idx);
-    // words_state.print0();
     printer_instance.printGrayedSentence();
     std.debug.print("\x1b[{}D", .{words_state.total_length});
 
@@ -155,29 +153,16 @@ pub fn main() !void {
         }
         // backspace
         if (byte == 127) {
-            // if (byte == '\x7f') {
-            // if (byte == '\x08') {
-                // if (words_state.word_states[word_idx].overflow.len > 0) {
             if (words_state.word_states[word_idx].getFilledOverFlowLen() > 0) {
                 printer_instance.printBackspace(word_idx, char_idx);
-                // printer_instance.printOverflowAfterBackspace(word_idx, byte);
                 printer_instance.printOverflow(word_idx, byte);
                 try words_state.removeLastOverflow(word_idx);
-                // char_idx -= 1;
-                // printer_instance.printBackspace(word_idx, char_idx);
-                // overflow_chars -= 1;
-                // std.debug.print("\x1b[1D \x1b[1D", .{});
             } else if (char_idx > 0) {
                 char_idx -= 1;
                 printer_instance.printBackspace(word_idx, char_idx);
                 printer_instance.printIndexes(word_idx, char_idx);
                 try words_state.setCharStateAt(word_idx, char_idx, .toComplete);
-                // if (words_state.useWordState(word_idx) catch null) |words_state| { words_state.char_states[char_idx] = .toComplete; }
-                // words_state.getWordState(word_idx).
                 continue;
-                // char_in_word -= 1;
-                // const target_char = words[current_word][char_in_word];
-                // std.debug.print("\x1b[1D{s}{c}{s}\x1b[1D", .{ Color.gray.toString(), target_char, Color.reset.toString() });
             } else if (char_idx == 0) {
                 if (word_idx >= 1) {
                     char_idx = printer_instance.printJumpToPrecedentWordAndReturnNewCharIndex(word_idx, char_idx) catch {
@@ -189,52 +174,26 @@ pub fn main() !void {
                 } else if (word_idx == 0) {
                     continue;
                 }
-                // const new_char_idx = if (words_state.getWordState(word_idx)) |words_state| words_state.getLastCharIdxToFill() else |_| 0;
-                // const new_char_idx = words_state.getLastCharIdxToFill(word_idx);
-                // if (printer_instance.printJumpToPrecedentWordAndReturnNewCharIndex(word_idx, char_idx)) |new_char_idx| {
-                // } else |_| {
-                //     continue;
-                // }
             } else if (char_idx < 0) {
                 //todo: throw an error ?
             }
             continue;
         }
         if (byte == ' ') {
-            // words_state.newPrint(word_idx, char_idx);
-            // if (l)
             if (word_idx < words_state.word_slices.len - 1) {
-                //                 // Skip remaining chars in current word and the space
-                //                 const remaining_chars = words[current_word].len - char_in_word;
-                //                 if (remaining_chars > 0) {
-                //                     std.debug.print("\x1b[{}C", .{remaining_chars});
-                //                 }
-                //                 std.debug.print("\x1b[1C", .{}); // skip the space
-                //
                 printer_instance.printJumpToNextWord(word_idx, char_idx);
                 word_idx += 1;
                 char_idx = 0;
                 printer_instance.printIndexes(word_idx, char_idx);
                 continue;
             }
-            // printColoredChar(.gray, ' ');
-            // char_idx = 0;
-            // word_idx += 1;
-        // } else if (std.ascii.isAlphabetic(byte) or isValidPunct(byte)) {
         } else if (std.ascii.isAlphabetic(byte)) {
-            // const wrd_state_ptr: ?* const WordState= words_state.getWordState(word_idx) catch null;
-            // if (wrd_state_ptr) {
             const indexOverflow: usize = words_state.word_states[word_idx].updateCharAt(char_idx, byte) catch {
                 continue;
             };
-            // if (indexOverflow == 0) {
-                printer_instance.printCharAt(word_idx, char_idx, byte);
-            // } else {
-                // printer_instance.printOverflow(word_idx, char_idx, byte);
-                printer_instance.printOverflow(word_idx, byte);
-            // }
+            printer_instance.printCharAt(word_idx, char_idx, byte);
+            printer_instance.printOverflow(word_idx, byte);
             char_idx += indexOverflow;
-            // }
             continue;
         }
     }

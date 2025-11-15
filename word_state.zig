@@ -45,10 +45,6 @@ pub const WordState = struct {
     }
 
     pub fn removeLastOverflow(self: *WordState) !void {
-        // const overFlowLen: usize = self.getLastCharIdxToFill();
-        // if (overFlowLen < 0 or MAX_CHARS_OVERFLOW <= overFlowLen) return error.IndexOutOfBounds;
-        // self.overflow[self.getLastCharIdxToFill()] = 0;
-
         var i: usize = self.overflow.len;
         while (i > 0) {
             i -= 1;
@@ -91,7 +87,6 @@ pub const WordState = struct {
             return 1;
         } else {
             // Overflow case - increment overflow counter
-            // const overflow_idx = index - self.word_slice.len;
             const overflow_idx = self.getFilledOverFlowLen();
             if (overflow_idx >= MAX_CHARS_OVERFLOW - 1) return error.MaxOverflowReached;
             self.overflow[overflow_idx] = typed_char;
