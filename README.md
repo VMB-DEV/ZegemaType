@@ -48,7 +48,7 @@ zegemaType
 ```
 
 <p align="center">
-    <img src="https://github.com/VMB-DEV/ZegemaType/blob/main/.gitRes/typing.gif">
+    <img src="https://github.com/VMB-DEV/ZegemaType/blob/master/.gitRes/typing.gif">
 </p>
 
 ### How to Use
