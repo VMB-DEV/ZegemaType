@@ -1,4 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="BuildScanner">
+    <option name="projects">
+      <list><![CDATA[{
+  "name": null,
+  "version": null,
+  "path": "/home/vkdev/IdeaProjects/ZegemaType",
+  "steps": [
+    {
+      "name": "install",
+      "description": "Copy build artifacts to prefix path",
+      "kind": "install_artifact"
+    },
+    {
+      "name": "uninstall",
+      "description": "Remove build artifacts from prefix path",
+      "kind": "uninstall"
+    },
+    {
+      "name": "run",
+      "description": "Run the app",
+      "kind": "run"
+    }
+  ],
+  "modules": [
+    {
+      "root": "main.zig",
+      "public": false,
+      "imports": []
+    }
+  ],
+  "dependencies": []
+}]]></list>
+    </option>
+  </component>
   <component name="ZigToolchain" toolchain="b4a8c01e-5e9d-4ef9-b9e6-0dbcf8ebd180" />
 </project>
