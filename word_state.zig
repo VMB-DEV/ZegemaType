@@ -44,6 +44,28 @@ pub const WordState = struct {
         return self.char_states.len;
     }
 
+    pub fn isPartiallyValid(self: *const WordState) bool {
+        var fully_valid: bool = true;
+        var unvalid: usize = 0;
+        for (self.char_states) |char_state| {
+            if (char_state != .valid) {
+                unvalid += 1;
+                fully_valid = false;
+            }
+        }
+        if (fully_valid) {
+            return true;
+        }
+        return @as(f64, @floatFromInt(unvalid)) < 0.35 * @as(f64, @floatFromInt(self.char_states.len));
+    }
+
+    pub fn isValid(self: *const WordState) bool {
+        for (self.char_states) |char_state| {
+            if (char_state != .valid) return false;
+        }
+        return true;
+    }
+
     pub fn removeLastOverflow(self: *WordState) !void {
         var i: usize = self.overflow.len;
         while (i > 0) {
@@ -92,6 +114,9 @@ pub const WordState = struct {
             self.overflow[overflow_idx] = typed_char;
             return 0;
         }
+    }
+    pub fn doesWordEndWithValidatedChar(self: *WordState) bool {
+        return self.char_states[self.char_states.len - 1] == .valid;
     }
 
     pub fn print(self: WordState) void {

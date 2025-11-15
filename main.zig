@@ -129,8 +129,9 @@ pub fn main() !void {
     defer enableEcho() catch {};
 
     const number_of_words: comptime_int = 10;
+    // const number_of_words: comptime_int = 3;
     const words_state: WordsState = try WordsState.init(allocator, number_of_words);
-    const printer_instance: Printer = Printer.init(&words_state);
+    var printer_instance: Printer = Printer.init(&words_state);
 
 
     var buffer: [1]u8 = undefined;
@@ -138,18 +139,28 @@ pub fn main() !void {
     var word_idx: usize = 0;
     var char_idx: usize = 0;
 
+    std.debug.print("\n", .{});
     printer_instance.printGrayedSentence();
     std.debug.print("\x1b[{}D", .{words_state.total_length});
 
+    var hasStarted = false;
     while (esc_count < 2) {
-        printer_instance.printIndexes(word_idx, char_idx);
+        if (words_state.isSentenceDone()) break;
+
+        // printer_instance.printIndexes(word_idx, char_idx);
         const bytes_read = try std.fs.File.stdin().read(&buffer);
         if (bytes_read == 0) break;
         const byte = buffer[0];
 
+        if (!hasStarted) {
+            hasStarted = true;
+            printer_instance.startChrono();
+        }
         // escape key
         if (byte == '\x1b') {
             esc_count += 1;
+        } else {
+            esc_count = 0;
         }
         // backspace
         if (byte == 127) {
@@ -160,7 +171,7 @@ pub fn main() !void {
             } else if (char_idx > 0) {
                 char_idx -= 1;
                 printer_instance.printBackspace(word_idx, char_idx);
-                printer_instance.printIndexes(word_idx, char_idx);
+                // printer_instance.printIndexes(word_idx, char_idx);
                 try words_state.setCharStateAt(word_idx, char_idx, .toComplete);
                 continue;
             } else if (char_idx == 0) {
@@ -169,7 +180,7 @@ pub fn main() !void {
                         continue;
                     };
                     word_idx -= 1;
-                    printer_instance.printIndexes(word_idx, char_idx);
+                    // printer_instance.printIndexes(word_idx, char_idx);
                     continue;
                 } else if (word_idx == 0) {
                     continue;
@@ -184,7 +195,7 @@ pub fn main() !void {
                 printer_instance.printJumpToNextWord(word_idx, char_idx);
                 word_idx += 1;
                 char_idx = 0;
-                printer_instance.printIndexes(word_idx, char_idx);
+                // printer_instance.printIndexes(word_idx, char_idx);
                 continue;
             }
         } else if (std.ascii.isAlphabetic(byte)) {
@@ -197,4 +208,5 @@ pub fn main() !void {
             continue;
         }
     }
+    printer_instance.printEnd();
 }
