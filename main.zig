@@ -160,7 +160,8 @@ pub fn main() !void {
                 // if (words_state.word_states[word_idx].overflow.len > 0) {
             if (words_state.word_states[word_idx].getFilledOverFlowLen() > 0) {
                 printer_instance.printBackspace(word_idx, char_idx);
-                printer_instance.printOverflowAfterBackspace(word_idx, byte);
+                // printer_instance.printOverflowAfterBackspace(word_idx, byte);
+                printer_instance.printOverflow(word_idx, byte);
                 try words_state.removeLastOverflow(word_idx);
                 // char_idx -= 1;
                 // printer_instance.printBackspace(word_idx, char_idx);
@@ -219,7 +220,8 @@ pub fn main() !void {
             // printColoredChar(.gray, ' ');
             // char_idx = 0;
             // word_idx += 1;
-        } else if (std.ascii.isAlphabetic(byte) or isValidPunct(byte)) {
+        // } else if (std.ascii.isAlphabetic(byte) or isValidPunct(byte)) {
+        } else if (std.ascii.isAlphabetic(byte)) {
             // const wrd_state_ptr: ?* const WordState= words_state.getWordState(word_idx) catch null;
             // if (wrd_state_ptr) {
             const indexOverflow: usize = words_state.word_states[word_idx].updateCharAt(char_idx, byte) catch {

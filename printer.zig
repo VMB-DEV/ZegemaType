@@ -38,47 +38,22 @@ pub const Printer = struct {
             }
         }
     }
-    pub fn printOverflowAfterBackspace(self: *const Printer, word_idx: usize, input: u8) void {
-        if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
-            printChar(.error_bg, input);
-            Ansi.saveCursorPosition();
-            Ansi.hideCursor();
-            var offset: usize = 0;
-            for (self.words_state_ptr.word_states, 0..) |word_state_val, word_idx_val| {
-                if (word_idx_val <= word_idx) continue;
-                printChar(.gray, ' ');
-                printWord(word_state_val, .gray);
-                offset += 1 + word_state_val.word_slice.len;
-            }
-            Ansi.restorCursorPosition();
-            Ansi.showCursor();
-        }
-    }
-    // pub fn printOverflow(self: *const Printer, word_idx: usize, char_idx: usize, input: u8) void {
-    // pub fn printOverflow(self: *const Printer, word_idx: usize, input: ?u8) void {
+
     pub fn printOverflow(self: *const Printer, word_idx: usize, input: u8) void {
         if (word_idx < self.words_state_ptr.word_slices.len and self.words_state_ptr.word_states[word_idx].getFilledOverFlowLen() > 0) {
-            // if (input) |actual_input| printChar(.error_bg, actual_input);
             printChar(.error_bg, input);
             Ansi.saveCursorPosition();
             Ansi.hideCursor();
-            // std.debug.print("\x1b[s", .{}); // Save cursor position
-            // if (self.words_state_ptr.word_states.len < word_idx + 1)
             var offset: usize = 0;
             for (self.words_state_ptr.word_states, 0..) |word_state_val, word_idx_val| {
-            // for (self.words_state_ptr.word_states, 0..) |word_state_val| {
                 if (word_idx_val <= word_idx) continue;
                 printChar(.gray, ' ');
                 printWord(word_state_val, .gray);
                 offset += 1 + word_state_val.word_slice.len;
             }
+            printChar(.gray, ' ');
             Ansi.restorCursorPosition();
             Ansi.showCursor();
-            // std.debug.print("\x1b[u", .{}); // Restore cursor position
-                                            //
-            // printWord(self.words_state_ptr.word_states[word_idx + 1], .gray);
-            // self.printCharAt(word_idx: usize, char_idx: usize, input: u8)
-            // self.printJumpToNextWord(word_idx, char_idx );
         }
     }
 
