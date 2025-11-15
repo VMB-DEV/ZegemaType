@@ -11,6 +11,7 @@ pub const Color = enum {
     correct_underline,
     error_fg_underline,
     error_bg_underline,
+    blue,
 
     pub fn toString(self: Color) []const u8 {
         return switch (self) {
@@ -23,6 +24,7 @@ pub const Color = enum {
             .correct_underline => "\x1b[4;38;2;226;183;20m",
             .error_fg_underline => "\x1b[4;38;2;202;71;84m",
             .error_bg_underline => "\x1b[4;48;2;156;51;63m",
+            .blue => "\x1b[38;2;100;150;255m",
         };
     }
 };

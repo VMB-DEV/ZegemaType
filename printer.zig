@@ -1,12 +1,12 @@
 const std = @import("std");
+
 const color = @import("color.zig");
-const word_state = @import("word_state.zig");
-const words_state = @import("words_state.zig");
 const Color = color.Color;
+const word_state = @import("word_state.zig");
 const WordState = word_state.WordState;
 const CharState = word_state.CharState;
+const words_state = @import("words_state.zig");
 const WordsState = words_state.WordsState;
-
 
 pub const Printer = struct {
     words_state_ptr: *const WordsState,
@@ -112,7 +112,7 @@ pub const Printer = struct {
             printWord(word_state_val, null);
             printChar(.gray, ' ');
         }
-        std.debug.print("\x1b[u", .{}); // Restore cursor position
+        Ansi.restorCursorPosition();
     }
 
     pub fn printIndexes(self: *const Printer, word_idx: usize, char_idx: usize) void {
@@ -127,7 +127,26 @@ pub const Printer = struct {
     }
 
     pub fn printEnd(self: *const Printer) void {
-        std.debug.print("\ntime: {d:.1} s\n", .{self.getChronoS()});
+        std.debug.print("\n", .{});
+        std.debug.print("wpm: {s}{d}{s}", .{ Color.blue.toString(), self.getWPM(), Color.reset.toString() });
+        std.debug.print("\t---\t", .{});
+        std.debug.print("time: {d:.1} s", .{ self.getChronoS()});
+        std.debug.print("\n", .{});
+    }
+    pub fn getWPM(self: *const Printer) i64 {
+        const ms_time: i64 = self.getChronoMs();
+        const numberOfCorrectWords: f64 = @as(f64, @floatFromInt(self.words_state_ptr.getValidWords()));
+        const numberOfParialWords: f64 = @as(f64, @floatFromInt(self.words_state_ptr.getPartiallyValidWords()));
+        const avgCharsPerWords: f64 = self.words_state_ptr.getAvgCharPerWord();
+        if (numberOfCorrectWords == 0) return 0.0;
+
+        const minutes: f64 = @as(f64, @floatFromInt(ms_time)) / @as(f64, std.time.ms_per_min);
+        const wpm: f64 = numberOfCorrectWords / minutes;
+        const awpm: f64 = (avgCharsPerWords / words_state.AVG_CHAR_PER_WORD) * wpm;
+        const pwpm: f64 = numberOfParialWords / minutes;
+        const mix = ((wpm * 5) + (awpm) + (pwpm * 3)) / 9;
+
+        return @intFromFloat(mix);
     }
     pub fn startChrono(self: *Printer) void {
         self.start_time_ms = std.time.milliTimestamp();
