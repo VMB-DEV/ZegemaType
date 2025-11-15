@@ -159,6 +159,8 @@ pub fn main() !void {
         // escape key
         if (byte == '\x1b') {
             esc_count += 1;
+        } else {
+            esc_count = 0;
         }
         // backspace
         if (byte == 127) {
