@@ -144,10 +144,6 @@ pub fn main() !void {
 
     var hasStarted = false;
     while (esc_count < 2) {
-        if (!hasStarted) {
-            hasStarted = true;
-            printer_instance.startChrono();
-        }
         if (words_state.isSentenceDone()) break;
 
         printer_instance.printIndexes(word_idx, char_idx);
@@ -155,6 +151,10 @@ pub fn main() !void {
         if (bytes_read == 0) break;
         const byte = buffer[0];
 
+        if (!hasStarted) {
+            hasStarted = true;
+            printer_instance.startChrono();
+        }
         // escape key
         if (byte == '\x1b') {
             esc_count += 1;
