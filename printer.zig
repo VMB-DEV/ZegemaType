@@ -7,8 +7,10 @@ const WordState = word_state.WordState;
 const CharState = word_state.CharState;
 const WordsState = words_state.WordsState;
 
+
 pub const Printer = struct {
     words_state_ptr: *const WordsState,
+    start_time_ms: i64,
 
     pub fn printChar(char_color: Color, char: u8) void {
         std.debug.print("{s}{c}{s}", .{ char_color.toString(), char, Color.reset.toString() });
@@ -100,6 +102,7 @@ pub const Printer = struct {
     pub fn init(words_state_ptr: *const WordsState) Printer {
         return Printer{
             .words_state_ptr = words_state_ptr,
+            .start_time_ms = 0,
         };
     }
 
@@ -121,6 +124,20 @@ pub const Printer = struct {
             std.debug.print("[{}, {}, {}, {}]  ", .{ w_idx, word_state_val.word_slice.len, word_state_val.getLastCharIdxToFill(), word_state_val.getFilledOverFlowLen() });
         }
         Ansi.restorCursorPosition();
+    }
+
+    pub fn printEnd(self: *const Printer) void {
+        std.debug.print("\ntime: {d:.1} s\n", .{self.getChronoS()});
+    }
+    pub fn startChrono(self: *Printer) void {
+        self.start_time_ms = std.time.milliTimestamp();
+    }
+    pub fn getChronoS(self: *const Printer) f64 {
+        const ms: f64 = @floatFromInt(self.getChronoMs());
+        return ms / 1000.0;
+    }
+    pub fn getChronoMs(self: *const Printer) i64 {
+        return std.time.milliTimestamp() - self.start_time_ms;
     }
 };
 

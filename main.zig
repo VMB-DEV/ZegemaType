@@ -128,9 +128,10 @@ pub fn main() !void {
     try disableEcho();
     defer enableEcho() catch {};
 
-    const number_of_words: comptime_int = 10;
+    // const number_of_words: comptime_int = 10;
+    const number_of_words: comptime_int = 3;
     const words_state: WordsState = try WordsState.init(allocator, number_of_words);
-    const printer_instance: Printer = Printer.init(&words_state);
+    var printer_instance: Printer = Printer.init(&words_state);
 
 
     var buffer: [1]u8 = undefined;
@@ -141,7 +142,13 @@ pub fn main() !void {
     printer_instance.printGrayedSentence();
     std.debug.print("\x1b[{}D", .{words_state.total_length});
 
+    var hasStarted = false;
     while (esc_count < 2) {
+        if (!hasStarted) {
+            hasStarted = true;
+            printer_instance.startChrono();
+        }
+
         printer_instance.printIndexes(word_idx, char_idx);
         const bytes_read = try std.fs.File.stdin().read(&buffer);
         if (bytes_read == 0) break;
@@ -197,4 +204,5 @@ pub fn main() !void {
             continue;
         }
     }
+    printer_instance.printEnd();
 }
