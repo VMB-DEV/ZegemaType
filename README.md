@@ -47,6 +47,10 @@ sudo ln -s /path/to/ZegemaType/zig-out/bin/zegemaType /usr/local/bin/zegemaType
 zegemaType
 ```
 
+<p align="center">
+    <img src="https://github.com/VMB-DEV/ZegemaType/blob/main/.gitRes/typing.gif">
+</p>
+
 ### How to Use
 
 1. When you start the application, a sentence with random words will appear in gray
