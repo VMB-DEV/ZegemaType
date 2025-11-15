@@ -4,10 +4,6 @@
 
 Terminal-based typing speed test application written in Zig.
 
-<p align="center">
-    <img src="https://github.com/VMB-DEV/ZegemaType/blob/main/.gitRes/typing.gif">
-</p>
-
 
 ## Requirements
 
@@ -50,6 +46,10 @@ sudo ln -s /path/to/ZegemaType/zig-out/bin/zegemaType /usr/local/bin/zegemaType
 # Then run from anywhere
 zegemaType
 ```
+
+<p align="center">
+    <img src="https://github.com/VMB-DEV/ZegemaType/blob/main/.gitRes/typing.gif">
+</p>
 
 ### How to Use
 
