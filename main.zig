@@ -148,6 +148,7 @@ pub fn main() !void {
             hasStarted = true;
             printer_instance.startChrono();
         }
+        if (words_state.isSentenceDone()) break;
 
         printer_instance.printIndexes(word_idx, char_idx);
         const bytes_read = try std.fs.File.stdin().read(&buffer);

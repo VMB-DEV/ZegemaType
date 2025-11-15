@@ -93,6 +93,9 @@ pub const WordState = struct {
             return 0;
         }
     }
+    pub fn doesWordEndWithValidatedChar(self: *WordState) bool {
+        return self.char_states[self.char_states.len - 1] == .valid;
+    }
 
     pub fn print(self: WordState) void {
         for (self.word_slice, 0..) |char, i| {

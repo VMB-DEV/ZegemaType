@@ -87,6 +87,9 @@ pub const WordsState = struct {
         allocator.free(self.word_states);
         allocator.free(self.word_slices);
     }
+    pub fn isSentenceDone(self: *const WordsState) bool {
+       return self.word_states[self.word_slices.len - 1].doesWordEndWithValidatedChar();
+    }
 
     pub fn print(self: *const WordsState, word_idx: usize, char_idx: usize) void {
         std.debug.print("\x1b[?25l", .{}); // Hide cursor
